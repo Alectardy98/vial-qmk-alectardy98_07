@@ -30,7 +30,8 @@
     "rgb_matrix": {
         "animations": {
             "breathing": true,
-            "cycle_left_right": true
+            "cycle_left_right": true,
+            "solid_color": true
         },
         "driver": "ws2812",
         "layout": [
