@@ -184,17 +184,18 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 SEND_STRING(":thumbsup:" SS_TAP(X_ENTER));
                 break;
             case HRT1:
-                rgblight_mode(RGBLIGHT_MODE_BREATHING);
+                rgblight_mode(RGBLIGHT_MODE_BREATHING + 2);
                 rgblight_sethsv(200, 255, 255);
-                rgblight_set_speed(2);
+                rgblight_set_speed(5);
                 return false;
             case HRT2:
-                rgblight_mode(RGBLIGHT_MODE_RAINBOW_MOOD);
-                rgblight_set_speed(2);
+                rgblight_mode(RGBLIGHT_MODE_TWINKLE + 1);
+                rgblight_sethsv(200, 255, 255);
+                rgblight_set_speed(5);
                 return false;
             case HRT3:
-                rgblight_mode(RGBLIGHT_MODE_SNAKE);
-                rgblight_set_speed(0);
+                rgblight_mode(RGBLIGHT_MODE_RAINBOW_MOOD + 2);
+                rgblight_set_speed(5);
                 return false;
         }
     }
@@ -223,7 +224,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [_FN] = LAYOUT(
 
-        QK_BOOT,          UG_PREV, UG_NEXT, UG_HUEU, UG_HUED, UG_SATU, UG_SATD, UG_VALU, UG_VALD, UG_SPDU, UG_SPDD, _______, _______,             HRT1,    HRT2,    HRT3,
+        QK_BOOT,          UG_PREV, UG_NEXT, UG_HUED, UG_HUEU, UG_SATD, UG_SATU, UG_VALD, UG_VALU, UG_SPDD, UG_SPDU, _______, _______,             HRT1,    HRT2,    HRT3,
 
         _______,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_DEL,          _______, _______, _______,
            SNIP,    THIS,     OOF,    PIKA,    SCAT,    FCAT,    HART,    DROL,    MONY,    FHAT,    SPIT, _______, _______, _______,          _______, _______, _______,
@@ -244,7 +245,7 @@ const rgblight_segment_t PROGMEM capslock_layer[] = RGBLIGHT_LAYER_SEGMENTS(
 
 // _FN layer: cyan on all LEDs
 const rgblight_segment_t PROGMEM fn_layer[] = RGBLIGHT_LAYER_SEGMENTS(
-    { 0, RGBLIGHT_LED_COUNT, HSV_CYAN }
+    { 0, RGBLIGHT_LED_COUNT, HSV_BLUE }
 );
 
 // Lighting layers list (later overrides earlier)
