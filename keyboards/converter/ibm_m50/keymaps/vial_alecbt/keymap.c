@@ -207,7 +207,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
          
     [_BASE] = LAYOUT(
                  QK_BOOT,     CMD,    TASK,    KC_INS, KC_HOME, KC_PGUP,      THIS,    NICE,     OOF,    HAHA, \
-                 _______,   OU_BT,  OU_USB,    KC_DEL,  KC_END, KC_PGDN,      SCAT,    FCAT,    FHAT,    MONY, \
+                 _______, _______, _______,    KC_DEL,  KC_END, KC_PGDN,      SCAT,    FCAT,    FHAT,    MONY, \
                  _______,    SNIP,    EXPL,   KC_MPRV, KC_MPLY, KC_MNXT,      KING,    PPOG,    SPIT,    PIKA, \
                  _______,    COPY,    PAST,   KC_VOLD,   KC_UP, KC_VOLU,      SWET,    LCRY,    DROL,    COLD, \
                  _______,    VDLT,    VDRT,   KC_LEFT, KC_DOWN, KC_RGHT,      FLEX,    THUM,    PRAY,    HART  \

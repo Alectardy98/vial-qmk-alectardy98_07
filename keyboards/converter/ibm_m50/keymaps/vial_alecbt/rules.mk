@@ -1,17 +1,17 @@
 VIA_ENABLE = yes
 VIAL_ENABLE = yes
 VIAL_INSECURE = yes
-LTO_ENABLE = yes #dont use with bt
+LTO_ENABLE = no #dont use with bt
 
 
 
-DYNAMIC_MACRO_ENABLE = no
+DYNAMIC_MACRO_ENABLE = yes
 COMBO_ENABLE = no
-TAP_DANCE_ENABLE = yes
-KEY_OVERRIDE_ENABLE = yes
+TAP_DANCE_ENABLE = no
+KEY_OVERRIDE_ENABLE = no
 QMK_SETTINGS = no
-UNICODE_ENABLE = no
-BOOTMAGIC_ENABLE = yes      # Enable Bootmagic Lite
+UNICODE_ENABLE = yes
+BOOTMAGIC_ENABLE = no      # Enable Bootmagic Lite
 MOUSEKEY_ENABLE = no       # Mouse keys
 EXTRAKEY_ENABLE = yes       # Audio control and System control
 CONSOLE_ENABLE = yes         # Console for debug
