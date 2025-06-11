@@ -1,6 +1,6 @@
 # MCU name
 MCU = STM32F411
-BOOTLOADER = custom
+BOOTLOADER = tinyuf2
 # BOOTLOADER = stm32-dfu
 
 # RGB Matrix for top left side is31fl3236

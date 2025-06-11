@@ -2,6 +2,13 @@
  * @file custom_matrix.c
  */
 
+__asm__(
+    ".global _board_dfu_dbl_tap          \n"
+    "_board_dfu_dbl_tap:                 \n"
+    "    bx lr                           \n"
+);
+
+
 #include "matrix.h"
 #include "wait.h"
 #include "led.h"
@@ -180,3 +187,9 @@ bool matrix_scan_custom(matrix_row_t* raw)
 
 //     memcpy(data, (uint8_t*)readings + offset, 32);
 // }
+
+
+__attribute__((weak))
+void board_dfu_dbl_tap(void) {
+    // no-op; DFU will be triggered by our bootloader_jump() instead
+}
