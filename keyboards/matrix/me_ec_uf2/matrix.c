@@ -2,13 +2,6 @@
  * @file custom_matrix.c
  */
 
-__asm__(
-    ".global _board_dfu_dbl_tap          \n"
-    "_board_dfu_dbl_tap:                 \n"
-    "    bx lr                           \n"
-);
-
-
 #include "matrix.h"
 #include "wait.h"
 #include "led.h"
@@ -188,8 +181,30 @@ bool matrix_scan_custom(matrix_row_t* raw)
 //     memcpy(data, (uint8_t*)readings + offset, 32);
 // }
 
+#define DBL_TAP_MAGIC    0xf01669ef
+#define DBL_TAP_ADDR     ((volatile uint32_t *)0x2001FFF0)
+#define DBL_TAP_DELAY_MS 500
+
+void _board_dfu_dbl_tap(void) {
+    uint32_t t0 = chVTGetSystemTimeX();
+    uint32_t timeout = TIME_MS2I(DBL_TAP_DELAY_MS);
+
+    if (*DBL_TAP_ADDR == DBL_TAP_MAGIC) {
+        *DBL_TAP_ADDR = 0;
+        __asm__ volatile ("bkpt #0"); // <-- For debugging, remove when done
+        bootloader_jump();  // This calls TinyUF2 jump to bootloader
+    } else {
+        *DBL_TAP_ADDR = DBL_TAP_MAGIC;
+        chThdSleep(timeout);
+        *DBL_TAP_ADDR = 0;
+    }
+}
+
+#include "bootloader.h"
 
 __attribute__((weak))
-void board_dfu_dbl_tap(void) {
-    // no-op; DFU will be triggered by our bootloader_jump() instead
+void qk_bootmagic(void) {
+    bootloader_jump();
+    wait_ms(50);
+    bootloader_jump();
 }
