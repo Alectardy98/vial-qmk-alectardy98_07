@@ -12,7 +12,7 @@
       },
       {"name": "VDLT",
        "title": "Virtual Desktop Left",
-       "shortname": "VDLT"
+       "shortName": "VDLT"
       },
       {"name": "VDUP",
        "title": "Virtual Desktop Up",
