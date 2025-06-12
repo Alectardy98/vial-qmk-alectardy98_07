@@ -28,10 +28,10 @@ enum layer_names {                                             //Define Layers
 bool led_update_kb(led_t led_state) {  // Custom Locklight override
     uint8_t ibmpc_led = 0;
 
-    if (led_state.scroll_lock) {
+    if (layer_state_is(_FN)){
         ibmpc_led |= (1 << IBMPC_LED_SCROLL_LOCK);
     }
-    if (led_state.num_lock) {
+    if (layer_state_is(_NUM)){
         ibmpc_led |= (1 << IBMPC_LED_NUM_LOCK);
     }
     if (led_state.caps_lock) {
