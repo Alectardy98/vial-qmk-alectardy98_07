@@ -3,33 +3,159 @@
   "vendorId": "0x7281",
   "productId": "0x0112",
   "lighting": "none",
+  "customKeycodes": [
+      {"name": "VDRT",
+       "title": "Virtual Desktop Right",
+       "shortName": "VDRT"
+      },
+      {"name": "VDLT",
+       "title": "Virtual Desktop Left",
+       "shortName": "VDLT"
+      },
+      {"name": "VDUP",
+       "title": "Virtual Desktop Up",
+       "shortName": "VDUP"
+      },
+      {"name": "VDDN",
+       "title": "Virtual Desktop Down",
+       "shortName": "VDDN"
+      },
+      {"name": "EXPL",
+       "title": "File Explorer",
+       "shortName": "EXPL"
+      },
+      {"name": "SNIP",
+       "title": "Screenshot Snip Tool",
+       "shortName": "SNIP"
+      },
+      {"name": "COPY",
+       "title": "Copy All",
+       "shortName": "COPY"
+      },
+      {"name": "CUTT",
+       "title": "Cut All",
+       "shortName": "CUTT"
+      },
+      {"name": "PAST",
+       "title": "Paste Over",
+       "shortName": "PAST"
+      },
+      {"name": "TASK",
+       "title": "Task Manager",
+       "shortName": "TASK"
+      },
+      {"name": "QUIT",
+       "title": "Close App",
+       "shortName": "QUIT"
+      },
+      {"name": "THIS",
+       "title": ":this: emoji on discord",
+       "shortName": "THIS"
+      },
+      {"name": "OOF",
+       "title": ":oof: emoji on discord",
+       "shortName": "OOF"
+      },
+      {"name": "PIKA",
+       "title": ":surprised: emoji on discord",
+       "shortName": "PIKA"
+      },
+      {"name": "SCAT",
+       "title": ":smiley_cat2: emoji on discord",
+       "shortName": "SCAT"
+      },
+      {"name": "FCAT",
+       "title": ":smiley_cat1: emoji on discord",
+       "shortName": "FCAT"
+      },
+      {"name": "HART",
+       "title": ":heart: emoji on discord",
+       "shortName": "HART"
+      },
+      {"name": "DROL",
+       "title": "drooling_face: emoji on discord",
+       "shortName": "DROL"
+      },
+      {"name": "MONY",
+       "title": "smiley_take: emoji on discord",
+       "shortName": "MONY"
+      },
+      {"name": "FHAT",
+       "title": ":smiley_fedora: emoji on discord",
+       "shortName": "FHAT"
+      },
+      {"name": "SPIT",
+       "title": ":smiley_spit: emoji on discord",
+       "shortName": "SPIT"
+      },
+      {"name": "KING",
+       "title": ":pepe_king: emoji on discord",
+       "shortName": "KING"
+      },
+      {"name": "FLEX",
+       "title": ":muscle: emoji on discord",
+       "shortName": "FLEX"
+      },
+      {"name": "HAHA",
+       "title": ":smiley_kekw: emoji on discord",
+       "shortName": "HAHA"
+      },
+      {"name": "LCRY",
+       "title": ":joy: emoji on discord",
+       "shortName": "LCRY"
+      },
+      {"name": "NICE",
+       "title": ":nice~2: emoji on discord",
+       "shortName": "NICE"
+      },
+      {"name": "PPOG",
+       "title": ":pepe_pog: emoji on discord",
+       "shortName": "PPOG"
+      },
+      {"name": "PRAY",
+       "title": ":pray_tone2: emoji on discord",
+       "shortName": "PRAY"
+      },
+      {"name": "SWET",
+       "title": ":sweat_smile: emoji on discord",
+       "shortName": "SWET"
+      },
+      {"name": "COLD",
+       "title": ":cold_face: emoji on discord",
+       "shortName": "COLD"
+      },
+      {"name": "THUM",
+       "title": ":thumbsup: emoji on discord",
+       "shortName": "THUM"
+      }
+  ],
   "matrix": { "rows": 8, "cols": 16 },
   "layouts": {
     "labels": [
       "Split Backspace",
       [
           "Enter",
-          "BAE",
           "ANSI",
+          "BAE",
           "ISO",
           "JAP"
       ],
       [
           "Left Shift",
-          "Full",
+          "Alec Mod",
           "Split",
-          "Alec Mod"
+          "Full"
       ],
       "Split Right Shift",
-      "Split Numpad Plus",
-      "Split Numpad Enter",
-      "Split Numpad Zero",
+      "Full Numpad Plus",
+      "Full Numpad Enter",
+      "Full Numpad Zero",
 
       [
           "Bottom Row",
-          "10u",
+          "Alec Mod",
           "Alt Mod",
-          "Alec Mod"
+          "10u"
       ]
     ],
     "keymap": [
@@ -90,6 +216,18 @@
           "3, 10",
           "4, 11",
           {
+            "w": 1.5
+          },
+          "3, 11\n\n\n1,0",
+          {
+            "x": 0.5
+          },
+          "3, 13",
+          "2, 14",
+          "2, 15",
+          "3, 15\n\n\n4,0",
+          {
+            "x": 1.25,
             "w": 1.5,
             "h": 2,
             "w2": 2.25,
@@ -97,22 +235,7 @@
             "x2": -0.75,
             "y2": 1
           },
-          "5,11\n\n\n1,0",
-          {
-            "x": 0.5
-          },
-          "3, 13",
-          "2, 14",
-          "2, 15",
-          {
-            "h": 2
-          },
-          "3, 15\n\n\n4,0",
-          {
-            "x": 1.25,
-            "w": 1.5
-          },
-          "3, 11\n\n\n1,1",
+          "5,11\n\n\n1,1",
           {
             "x": 1.25,
             "w": 1.25,
@@ -128,7 +251,8 @@
           },
           "3, 11\n\n\n1,3",
           {
-            "x": 1
+            "x": 1,
+            "h": 2
           },
           "3, 15\n\n\n4,1"
         ],
@@ -152,18 +276,18 @@
           "4, 9",
           "5, 10",
           {
-            "x": 2.75
+            "w": 2.25
+          },
+          "5, 11\n\n\n1,0",
+          {
+            "x": 0.5
           },
           "4, 13",
           "4, 14",
           "3, 14",
+          "4, 15\n\n\n4,0",
           {
-            "x": 1.5,
-            "w": 2.25
-          },
-          "5, 11\n\n\n1,1",
-          {
-            "x": 0.25
+            "x": 3
           },
           "4, 10\n\n\n1,2",
           {
@@ -173,11 +297,7 @@
           {
             "w": 1.25
           },
-          "5, 11\n\n\n1,3",
-          {
-            "x": 1
-          },
-          "4, 15\n\n\n4,1"
+          "5, 11\n\n\n1,3"
         ],
         [
           "6, 0",
@@ -207,9 +327,6 @@
           "6, 13",
           "5, 14",
           "5, 15",
-          {
-            "h": 2
-          },
           "6, 15\n\n\n5,0",
           {
             "x": 0.5,
@@ -226,7 +343,8 @@
           },
           "6, 11\n\n\n3,1",
           {
-            "x": 3
+            "x": 3,
+            "h": 2
           },
           "6, 15\n\n\n5,1"
         ],
@@ -238,39 +356,47 @@
             "w": 1.5
           },
           "7, 2\n\n\n2,0",
+          "5, 2\n\n\n2,0",
           {
-            "x": 1,
-            "w": 10
+            "w": 1.5
+          },
+          "7, 3\n\n\n7,0",
+          {
+            "w": 7
           },
           "7, 5\n\n\n7,0",
           {
-            "x": 1,
-            "w": 1.5
+            "w": 2.75
+          },
+          "7, 7\n\n\n7,0",
+          {
+            "w": 1.25
           },
           "7, 11\n\n\n7,0",
           {
-            "x": 0.5,
-            "w": 2
+            "x": 0.5
           },
+          "7, 13\n\n\n6,0",
           "7, 14\n\n\n6,0",
           "6, 14",
+          "7, 15\n\n\n5,0",
           {
-            "x": 1.5,
+            "x": 0.5,
             "w": 1.5
           },
-          "7, 2\n\n\n2,1",
-          {
-            "x": 4
-          },
-          "7, 13\n\n\n6,1",
-          "7, 14\n\n\n6,1",
-          {
-            "x": 0.75
-          },
-          "7, 15\n\n\n5,1"
+          "7, 2\n\n\n2,1"
         ],
         [
           {
+            "y": -0.75,
+            "x": 26.25,
+            "w": 2
+          },
+          "7, 14\n\n\n6,1"
+        ],
+        [
+          {
+            "y": -0.25,
             "x": 22.5,
             "w": 2.25
           },
@@ -303,30 +429,23 @@
             "x": 22.5,
             "w": 1.5
           },
-          "7, 2\n\n\n2,2",
-          "5, 2\n\n\n2,2"
+          "7, 2\n\n\n2,2"
         ],
         [
           {
             "y": -0.25,
             "x": 5,
-            "w": 1.5
-          },
-          "7, 3\n\n\n7,2",
-          {
-            "w": 7
+            "w": 10
           },
           "7, 5\n\n\n7,2",
           {
-            "w": 2.75
-          },
-          "7, 7\n\n\n7,2",
-          {
-            "w": 1.25
+            "x": 1,
+            "w": 1.5
           },
           "7, 11\n\n\n7,2"
         ]
       ]
+
 
   }
 }
