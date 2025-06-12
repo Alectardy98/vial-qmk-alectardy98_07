@@ -34,14 +34,7 @@ enum blender_keycode {
     CUTT,                   //Cut All
     PAST,                   //Paste Over
     TASK,                   //Task Manager
-    GOGL,                   //Opens Google Chrome, Set in automator on mac to Controll + Alt + G
-    CMD,                    //Opens Comand Prompt, Set In automator on mac to Controll + Alt + T
     QUIT,                   //Close App
-    DZRO,                   //Double Zero
-    ATAB,                   //Alt + Tab "brew install alt-tab on mac"
-    LPRC,                   //The "(" Key
-    RPRC,                   //The ")" Key
-    NUM,                    //Num Lock for both mac and windows
     //Discord Section
     THIS,                   //Macro for ":this:" emoji on discord
     OOF,                    //Macro for ":oof:" emoji on discord
@@ -102,31 +95,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 SEND_STRING(SS_LCTL(SS_DOWN(X_RSFT) SS_TAP(X_ESCAPE) SS_UP(X_RSFT)));  // Windows
                 SEND_STRING(SS_LCTL(SS_DOWN(X_LALT) SS_TAP(X_ESCAPE) SS_UP(X_LALT)));    // Mac
                 break;
-            case GOGL:
-                SEND_STRING(SS_LCTL(SS_LALT(SS_TAP(X_G))));
-                break;
-            case CMD:
-                SEND_STRING(SS_LCTL(SS_LALT(SS_TAP(X_T))));
-                break;
             case QUIT:
                 SEND_STRING(SS_LALT(SS_TAP(X_F4)));     // Windows
                 SEND_STRING(SS_LCTL(SS_TAP(X_W)));      // Mac
-                break;
-            case DZRO:
-                SEND_STRING("00");
-                break;
-            case ATAB:
-                SEND_STRING(SS_LALT(SS_TAP(X_TAB)));
-                break;
-            case LPRC:
-                SEND_STRING("(");
-                break;
-            case RPRC:
-                SEND_STRING(")");
-                break;
-            case NUM:
-                SEND_STRING(SS_TAP(X_NUM));         // Toggles layer change and presses the num lock button, to allow for Num lock toggle to occur for both Mac OS and Windows
-                return true;
                 break;
             // Discord Section
             case THIS:
@@ -208,29 +179,29 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
                           KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,  KC_F12,
 
      KC_ESC,    TASK,    KC_GRV,    KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0, KC_MINS,  KC_EQL, _______, KC_BSPC,      KC_INS, KC_HOME, KC_PGUP,   TG(_NUM), KC_PSLS, KC_PAST, KC_PMNS,
-    DM_PLY1, DM_PLY2,    KC_TAB,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P, KC_LBRC, KC_RBRC, _______,               KC_DEL,  KC_END, KC_PGDN,       KC_7,   KC_P8,    KC_9, KC_PPLS,
+    DM_PLY1, DM_PLY2,    KC_TAB,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P, KC_LBRC, KC_RBRC, KC_BSLS,               KC_DEL,  KC_END, KC_PGDN,       KC_7,   KC_P8,    KC_9, KC_PPLS,
        SNIP,    EXPL,   KC_CAPS,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L, KC_SCLN, KC_QUOT, _______,  KC_ENT,                         KC_UP,                KC_4,   KC_P5,    KC_6,  KC_TAB,
-       COPY,    PAST,   KC_LSFT, _______,    KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH, _______, KC_RSFT,              KC_LEFT, KC_DOWN, KC_RGHT,       KC_1,   KC_P2,   KC_P3, KC_PENT,
-       VDLT,   VDRT,    MO(_FN),          KC_LALT,                    KC_SPC,                                     KC_RALT,          KC_RCTL,                                KC_DOWN,                KC_0,    KC_0, KC_PDOT, _______
+       COPY,    PAST,   KC_LSFT, _______,    KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH, _______, KC_RSFT,              KC_LEFT, KC_DOWN, KC_RGHT,       KC_1,   KC_P2,    KC_3, KC_PENT,
+       VDLT,   VDRT,    MO(_FN),          KC_LALT,                    KC_SPC,                                     KC_RALT,          KC_RCTL,                                KC_DOWN,                KC_0, KC_PCMM, KC_PDOT, KC_BSPC
     ),
     [_NUM] = LAYOUT(
                         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
                         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
 
      _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,    _______, _______, _______,    _______, _______, _______, _______,
-     _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,             _______, _______, _______,    _______, _______, _______, _______,
-     _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                      _______,             _______, _______, _______, _______,
-     _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,             _______, _______, _______,    _______, _______, _______, _______,
-     _______, _______,  _______,          _______,                   _______,                                     _______,          _______,                               _______,             _______, _______, _______, _______
+     _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,             _______, _______, _______,    KC_HOME,   KC_UP, KC_PGUP, _______,
+     _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                      _______,             KC_LEFT, _______, KC_RGHT, _______,
+     _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,             _______, _______, _______,     KC_END, KC_DOWN, KC_PGDN, _______,
+     _______, _______,  _______,          _______,                   _______,                                     _______,          _______,                               _______,              KC_INS, _______, _______,  KC_DEL
     ),
     [_FN] = LAYOUT(
                         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
                         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
 
-     _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,    _______, _______, _______,    _______, _______, _______, _______,
-     _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,             _______, _______, _______,    _______, _______, _______, _______,
-     _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                      _______,             _______, _______, _______, _______,
-     _______, _______,  _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,             _______, _______, _______,    _______, _______, _______, _______,
-     _______, _______,  _______,          _______,                   _______,                                     _______,          _______,                               _______,             _______, _______, _______, _______    )
+     QK_BOOT, _______,   KC_ESC,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,  KC_F12,  _______, KC_DEL,    _______, _______, _______,    _______, _______, _______, _______,
+     DM_REC1, DM_REC2,     SNIP,    THIS,     OOF,    PIKA,    SCAT,    FCAT,    HART,    DROL,    MONY,    FHAT,    SPIT, _______, _______, _______,             _______, _______, _______,    _______,    VDUP, _______, _______,
+     _______, _______,  KC_LCTL, C(KC_A), C(KC_S), C(KC_D), C(KC_F), _______, _______, _______, _______, _______, KC_VOLD, KC_VOLU, _______, _______,                         VDUP,                VDLT,    QUIT,    VDRT, _______,
+     _______, _______,  _______, _______, C(KC_Z), C(KC_X), C(KC_C), C(KC_V), _______, _______, _______, KC_MPRV, KC_MNXT, KC_MPLY, _______, _______,                VDLT,    VDDN,    VDRT,    _______,    VDDN, _______, _______,
+     _______, _______,  _______,          KC_LGUI,                   _______,                                     _______,          _______,                               _______,             _______, _______, _______, _______    )
 };
 
