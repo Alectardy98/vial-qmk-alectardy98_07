@@ -220,9 +220,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [_FN] = LAYOUT(
     _______, _______,     QK_BOOT,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_DEL,     _______, _______, _______, _______, \
     DM_REC1, DM_REC2,        SNIP,    THIS,     OOF,    PIKA,    SCAT,    FCAT,    HART,    DROL,    MONY,    FHAT,    SPIT, _______, _______, _______,     _______,    VDUP, _______, _______, \
-    _______, _______,     _______, C(KC_A), C(KC_S), C(KC_D), C(KC_F), _______, _______, _______, _______, _______, KC_VOLD, KC_VOLU, _______,                 VDLT,    QUIT,    VDRT, _______, \
-    _______, _______,     _______, _______, C(KC_Z), C(KC_X), C(KC_C), C(KC_V), _______, _______, _______, KC_MPRV, KC_MNXT, KC_MPLY, _______, _______,     _______,    VDDN, _______, _______, \
-    _______, _______,     _______, _______,                                     _______,                                     _______, KC_RALT,              _______, _______, _______, _______)
+    CK_DOWN,   CK_UP,     _______, C(KC_A), C(KC_S), C(KC_D), C(KC_F), _______, _______, _______, _______, _______, KC_VOLD, KC_VOLU, _______,                 VDLT,    QUIT,    VDRT, _______, \
+    CK_TOGG,  CK_RST,     _______, _______, C(KC_Z), C(KC_X), C(KC_C), C(KC_V), _______, _______, _______, KC_MPRV, KC_MNXT, KC_MPLY, _______, _______,     _______,    VDDN, _______, _______, \
+    MU_TOGG, MU_NEXT,     _______, _______,                                     CK_TOGG,                                     _______, KC_RALT,              _______, _______, _______, _______)
 };
 
 const uint8_t music_map[MATRIX_ROWS][MATRIX_COLS] = LAYOUT(
