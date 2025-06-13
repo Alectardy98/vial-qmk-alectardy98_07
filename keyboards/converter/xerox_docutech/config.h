@@ -11,8 +11,8 @@
 #pragma once
 
 /* key matrix size */
-#define MATRIX_ROWS 16
-#define MATRIX_COLS 8
+#define MATRIX_ROWS 8
+#define MATRIX_COLS 16
 
 #if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega32U2__)
 #   define NEWS_KBD_RX_VECT        USART1_RX_vect

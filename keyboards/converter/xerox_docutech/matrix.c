@@ -32,82 +32,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "news.h"
 #include "lufa.h"
 
-//static uint8_t matrix[MATRIX_ROWS];
-//
-//inline uint8_t matrix_rows(void)
-//{return MATRIX_ROWS;}
-//
-//inline uint8_t matrix_cols(void)
-//{return MATRIX_COLS;}
 
-//void matrix_init(void)
 void matrix_init_custom(void)
-{
-	//#ifdef DEBUG
-	debug_enable = true;
-	debug_keyboard = true;
-	//#endif
+{    debug_enable = true;
+    debug_keyboard = true;
     serial_init();
-
-	//for(uint8_t x = 0; x < MATRIX_ROWS; x++)
-	//{current_matrix[x] = 0;}
-	
-	//matrix_init_quantum();
 }
 
-//__attribute__((weak)) void matrix_init_kb(void) { matrix_init_user(); }
-//
-//__attribute__((weak)) void matrix_scan_kb(void) { matrix_scan_user(); }
-//
-//__attribute__((weak)) void matrix_init_user(void) {}
-//
-//__attribute__((weak)) void matrix_scan_user(void) {}
 
-//uint8_t matrix_scan_custom(void)
 bool matrix_scan_custom(matrix_row_t current_matrix[])
 {
-	uint8_t keycode = 0;
-	uint8_t matrix_changed = 0;
-	uint8_t row = 0;
-	uint8_t col = 0;
-	uint8_t col_pos = 0;
+    uint8_t   keycode  = serial_recv();
+    uint8_t   matrix_changed = 0;
+    uint8_t   row = 0, col = 0;
+    matrix_row_t col_pos = 0;        // ← widen the mask to match your MATRIX_COLS
 
-	keycode = serial_recv();
-	row = (keycode & 0x78) >> 3;
-	col = keycode & 0x7;
-	col_pos = 1 << col;
+    // transpose decode (you already have this):
+    col = (keycode & 0x78) >> 3;
+    row =  keycode & 0x7;
 
-	if(!(keycode & 0x7F))
-	{return matrix_changed;}
+    // now build the mask as a matrix_row_t
+    col_pos = ((matrix_row_t)1 << col);
 
-	if(!(keycode & 0x80))
-	{
-		// exclusive or: if the same > false; if not the same > true
-		matrix_changed = (current_matrix[row] ^ col_pos) >> col;
-		current_matrix[row] |= col_pos;
-	}
-	else
-	{
-		matrix_changed = ((current_matrix[row] & col_pos) ^ 0) >> col;
-		current_matrix[row] &= ~col_pos;
-	}
+    if (!(keycode & 0x7F)) {
+        return matrix_changed;
+    }
 
-	//matrix_scan_quantum();
+    if (!(keycode & 0x80)) {
+        // key press
+        matrix_changed = (current_matrix[row] ^ col_pos) >> col;
+        current_matrix[row] |= col_pos;
+    } else {
+        // key release
+        matrix_changed = ((current_matrix[row] & col_pos) ^ 0) >> col;
+        current_matrix[row] &= ~col_pos;
+    }
 
-	//return matrix_changed;
-	return 1;
+    return 1;
 }
-
-//inline bool matrix_is_on(uint8_t row, uint8_t col)
-//{return 1;}
-//
-//inline matrix_row_t matrix_get_row(uint8_t row)
-//{return matrix[row];}
-//
-//void matrix_print(void)
-//{
-//	print("\nr/c 01234567\n");
-//	for (uint8_t row = 0; row < matrix_rows(); row++) {
-//		xprintf("%02X: %08b\n", row, bitrev(matrix_get_row(row)));
-//	}
-//}
