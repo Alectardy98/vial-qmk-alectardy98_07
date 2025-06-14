@@ -5,10 +5,10 @@ LTO_ENABLE = yes
 
 DYNAMIC_MACRO_ENABLE = yes
 COMBO_ENABLE = yes
-TAP_DANCE_ENABLE = no
-KEY_OVERRIDE_ENABLE = yes
+TAP_DANCE_ENABLE = yes
+KEY_OVERRIDE_ENABLE = no
 QMK_SETTINGS = yes
-UNICODE_ENABLE = false
+UNICODE_ENABLE = no
 BOOTMAGIC_ENABLE = no      # Enable Bootmagic Lite
 MOUSEKEY_ENABLE = no       # Mouse keys
 EXTRAKEY_ENABLE = yes       # Audio control and System control
