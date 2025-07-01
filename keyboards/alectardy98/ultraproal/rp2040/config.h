@@ -1,0 +1,20 @@
+
+// --- BAR LED 74HC595 ---
+#define HC595_SER_PIN     GP6
+#define HC595_SRCLK_PIN   GP10
+#define HC595_RCLK_PIN    GP7
+
+// --- MAX7219 8-SEGMENT ---
+#define MAX7219_CLK_PIN   GP13
+#define MAX7219_DIN_PIN   GP11
+#define MAX7219_LOAD_PIN  GP12
+
+
+/* Audio */
+#define AUDIO_PIN GP0
+#define AUDIO_PWM_DRIVER PWMD0
+#define AUDIO_PWM_CHANNEL RP2040_PWM_CHANNEL_A
+#define AUDIO_INIT_DELAY
+#define AUDIO_CLICKY
+#define AUDIO_VOICES
+#define MUSIC_MAP
