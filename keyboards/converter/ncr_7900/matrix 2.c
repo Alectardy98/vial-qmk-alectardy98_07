@@ -116,8 +116,8 @@ static const uint8_t sc_to_pos[256] = {
 };
 
 static matrix_row_t matrix[MATRIX_ROWS];
-static uint8_t      last_sc         = 0xFF;
-static bool         saw_zero        = false;
+static uint8_t      last_sc       = 0xFF;
+static bool         saw_zero      = false;
 static bool         pending_corrupt = false;
 
 // UART1 init @ SERIAL_UART_BAUD
@@ -142,25 +142,9 @@ void matrix_init(void) {
 
 uint8_t matrix_scan(void) {
     while (uart_avail()) {
-        uint8_t raw        = uart_read();
-        bool    is_corrupt = raw & 0x80;
-        uint8_t sc         = raw & 0x7F;
-
-        //
-        // ── VERY BASIC HEARTBEAT SYNC & ERROR CORRECTION ──
-        //
-        // 1) If we see a corrupted 0x00 (raw==0x80 → sc==0x00), treat as filler
-        if (is_corrupt && sc == 0x00) {
-            saw_zero = true;
-            continue;
-        }
-        // 2) If we see a corrupted idle (raw==0xDF → sc==0x5F), drop it
-        if (is_corrupt && sc == IDLE_CODE) {
-            saw_zero = false;
-            pending_corrupt = false;
-            continue;
-        }
-        // ───────────────────────────────────────────────────────
+        uint8_t raw = uart_read();
+        bool is_corrupt = raw & 0x80;
+        uint8_t sc = raw & 0x7F;
 
         // drop corrupted-idle 5F
         if (pending_corrupt && raw == IDLE_CODE) {
