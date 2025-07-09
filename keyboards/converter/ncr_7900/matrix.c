@@ -116,16 +116,14 @@ static const uint8_t sc_to_pos[256] = {
 };
 
 static matrix_row_t matrix[MATRIX_ROWS];
-static uint8_t      last_sc         = 0xFF;
-static bool         saw_zero        = false;
-static bool         pending_corrupt = false;
+static uint8_t      last_sc = 0xFF;
 
-// UART1 init @ SERIAL_UART_BAUD
-static inline void uart_init(void) {
+// UART init for 32U4 USART1 @ SERIAL_UART_BAUD
+static void uart_init(void) {
     uint16_t ubrr = (F_CPU / (16UL * SERIAL_UART_BAUD)) - 1;
     UBRR1L = (uint8_t)ubrr;
     UBRR1H = (uint8_t)(ubrr >> 8);
-    UCSR1A = 0;
+    // Enable RX, 8N1 frame
     UCSR1B = _BV(RXEN1);
     UCSR1C = _BV(UCSZ11) | _BV(UCSZ10);
 }
@@ -134,103 +132,64 @@ static inline uint8_t uart_read(void)   { return UDR1; }
 
 void matrix_init(void) {
     uart_init();
-    xprintf(">> MATRIX INIT\n");
     for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
         matrix[r] = 0;
     }
+    last_sc = 0xFF;
 }
 
 uint8_t matrix_scan(void) {
+    // Heartbeat detection state
+    static bool     hb_first = false;
+    static uint32_t hb_count = 0;
+
     while (uart_avail()) {
-        uint8_t raw        = uart_read();
-        bool    is_corrupt = raw & 0x80;
-        uint8_t sc         = raw & 0x7F;
+        // 1) Read and invert bits: high->low, low->high
+        uint8_t raw = ~uart_read();
 
-        //
-        // ── VERY BASIC HEARTBEAT SYNC & ERROR CORRECTION ──
-        //
-        // 1) If we see a corrupted 0x00 (raw==0x80 → sc==0x00), treat as filler
-        if (is_corrupt && sc == 0x00) {
-            saw_zero = true;
-            continue;
-        }
-        // 2) If we see a corrupted idle (raw==0xDF → sc==0x5F), drop it
-        if (is_corrupt && sc == IDLE_CODE) {
-            saw_zero = false;
-            pending_corrupt = false;
-            continue;
-        }
-        // ───────────────────────────────────────────────────────
-
-        // drop corrupted-idle 5F
-        if (pending_corrupt && raw == IDLE_CODE) {
-            pending_corrupt = false;
-            continue;
-        }
-        pending_corrupt = is_corrupt;
-
-        // handle any corrupted byte as a make of its masked code
-        if (is_corrupt) {
-            uint8_t pos = sc_to_pos[sc];
-            if (pos != 0xFF) {
-                uint8_t row = pos >> 4;
-                uint8_t col = pos & 0x0F;
-                xprintf("CORRUPT RAW:%02X →MAKE row%d,col%d\n", raw, row, col);
-                matrix[row] |= (1u << col);
-                last_sc = sc;
-            }
-            continue;
-        }
-
-        // 1) skip filler zero
-        if (raw == 0x00) {
-            saw_zero = true;
-            continue;
-        }
-        // 2) heartbeat idle: release last press-only key
-        if (raw == IDLE_CODE && saw_zero) {
-            if (last_sc != 0xFF) {
-                uint8_t pos = sc_to_pos[last_sc];
-                matrix[pos >> 4] &= ~(1u << (pos & 0x0F));
-                last_sc = 0xFF;
-            }
-            saw_zero = false;
-            continue;
-        }
-        saw_zero = false;
-
-        // mask noise and now treat sc = raw
-        sc = raw;
-        xprintf("RAW:%02X SC:%02X ", raw, sc);
-
-        // 3) explicit break?
-        if (last_sc != 0xFF && sc == (uint8_t)(last_sc - BREAK_DELTA)) {
-            xprintf("→BREAK\n");
-            uint8_t pos = sc_to_pos[last_sc];
-            matrix[pos >> 4] &= ~(1u << (pos & 0x0F));
-            last_sc = 0xFF;
-            continue;
-        }
-
-        // 4) make event
-        {
-            uint8_t pos = sc_to_pos[sc];
-            if (pos == 0xFF) {
-                xprintf("→IGNORE\n");
+        // 2) Heartbeat: original on-wire FF,41 becomes inverted 00,BE
+        if (!hb_first) {
+            if (raw == 0x00) {
+                hb_first = true;
                 continue;
             }
-            uint8_t row = pos >> 4;
-            uint8_t col = pos & 0x0F;
-            xprintf("→MAKE row%d,col%d\n", row, col);
-            // release previous
-            if (last_sc != 0xFF && last_sc != sc) {
-                uint8_t old = sc_to_pos[last_sc];
-                matrix[old >> 4] &= ~(1u << (old & 0x0F));
+        } else {
+            if (raw == (uint8_t)~IDLE_CODE) {
+                // full heartbeat detected
+                hb_first = false;
+                hb_count++;
+                // Optional: xprintf("Heartbeat #%u\n", hb_count);
+                continue;
+            } else {
+                // false-start, reset
+                hb_first = false;
             }
-            // press new
-            matrix[row] |= (1u << col);
-            last_sc = sc;
         }
+
+        // 3) Log raw and scan code for HID listen
+        xprintf("RAW:%02X SC:%02X ", raw, raw);
+
+        // 4) Map scan code to matrix position
+        uint8_t pos = sc_to_pos[raw];
+        if (pos == 0xFF) {
+            xprintf("→IGNORE\n");
+            continue;
+        }
+
+        // 5) Compute row and column
+        uint8_t row = pos >> 4;
+        uint8_t col = pos & 0x0F;
+
+        // 6) Release previous key (if different)
+        if (last_sc != 0xFF && last_sc != raw) {
+            uint8_t old = sc_to_pos[last_sc];
+            matrix[old >> 4] &= ~(1u << (old & 0x0F));
+        }
+        // 7) Press new key
+        matrix[row] |= (1u << col);
+        last_sc = raw;
+
+        xprintf("→MAKE row%u,col%u\n", row, col);
     }
     return 0;
 }
