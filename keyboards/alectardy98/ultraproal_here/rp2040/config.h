@@ -33,3 +33,7 @@
 #define BAR_SRCLK_PIN  GP1
 // Latch clock (STCP)
 #define BAR_RCLK_PIN   GP2
+
+#define MAX_DIN_PIN   GP7
+#define MAX_CLK_PIN   GP8
+#define MAX_CS_PIN    GP6

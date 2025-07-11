@@ -1,13 +1,13 @@
 #include "quantum.h"
 #include "config.h"
 
-// Pulse a pin high→low
+// Pulse a pin HIGH→LOW
 static inline void sr_pulse(uint8_t pin) {
     writePinHigh(pin);
     writePinLow(pin);
 }
 
-// Send & latch one byte (MSB first)
+// Send & latch one byte (MSB first) to the 74HC595
 void bar_led_write(uint8_t bits) {
     // 1) Hold latch low while shifting
     writePinLow(BAR_RCLK_PIN);
@@ -37,13 +37,23 @@ void keyboard_post_init_user(void) {
 }
 
 void matrix_scan_user(void) {
-    static uint16_t last_timer;
-    static bool on;
+    static uint32_t last_ms;
+    static uint8_t  idx;
 
-    if (timer_elapsed(last_timer) > 500) {
-        last_timer = timer_read();
-        on = !on;
-        // 0xFF = all LEDs on, 0x00 = all off
-        bar_led_write(on ? 0xFF : 0x00);
+    // Stamp the first timestamp
+    if (last_ms == 0) {
+        last_ms = timer_read();
+    }
+
+    // Every 200 ms, advance the “pixel”
+    if (timer_elapsed(last_ms) > 200) {
+        last_ms = timer_read();
+
+        // Light one LED at a time, moving down the bar:
+        // bit 7 → first LED, bit 0 → last LED
+        bar_led_write(1 << (7 - idx));
+
+        // Advance and wrap 0–7
+        idx = (idx + 1) & 0x07;
     }
 }
