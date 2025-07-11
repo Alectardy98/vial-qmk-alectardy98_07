@@ -15,27 +15,36 @@
  */
 
 #include QMK_KEYBOARD_H
-#include "quantum.h"
+#include QMK_KEYBOARD_H
 #include "bar_led_74hc595.h"
 #include "max7219_display.h"
 #include "print.h"
 
+static bool bar_on = false;
+
+void keyboard_pre_init_user(void) {
+    // blank the bar-graph immediately
+    bar_led_write(0xFF);
+}
+
 void keyboard_post_init_user(void) {
-    // 1) init both drivers
+    // init drivers once USB is up
     bar_led_init();
     max7219_init();
+    uprintf("Drivers initialized\n");
+}
 
-    // 2) turn ON all 8 bar-graph LEDs (active-low wiring: false → LED on)
+void matrix_scan_user(void) {
+    static uint32_t last_ms = 0;
+    if (timer_elapsed32(last_ms) < 500) return;
+    last_ms = timer_read32();
+
+    // blink the bar-graph
+    bar_on = !bar_on;
     for (uint8_t i = 0; i < 8; i++) {
-        bar_led_set(i, false);
+        bar_led_set(i, !bar_on);  // false→ON, true→OFF
     }
-
-    // 3) show “8” (all segments on in Code B) on all 8 digits
-    for (uint8_t d = 1; d <= 8; d++) {
-        max7219_set_digit(d, 8);
-    }
-
-    print("ALL DRIVERS ON\n");
+    uprintf("bar is now %s\n", bar_on ? "ON" : "OFF");
 }
 
 enum _layer {

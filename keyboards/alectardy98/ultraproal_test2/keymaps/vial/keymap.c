@@ -15,33 +15,32 @@
  */
 
 #include QMK_KEYBOARD_H
-#include "bar_led_74hc595.h"
-#include "max7219_display.h"
+#include "config.h"
 
+// prototypes for your drivers
+void bar_graph_init(void);
+void max7219_init(void);
+void bar_set_level(uint8_t lvl);
+void max7219_set_digit(uint8_t pos, uint8_t value);
 
-enum _layer {
-  _BASE,
-  _FN
-};
-
-void keyboard_post_init_user(void) {
-    bar_led_init();
+void matrix_init_user(void) {
+    // bring up both drivers…
+    bar_graph_init();
     max7219_init();
+
+    // …then turn *everything* off
+    bar_set_level(0);
+    for (uint8_t d = 1; d <= MAX7219_NUM_DIGITS; d++) {
+        // 0xF in decode‐mode = blank
+        max7219_set_digit(d, 0xF);
+    }
 }
 
-enum custom_keycodes {
-    BAR_0 = SAFE_RANGE,
-    BAR_1,
-    BAR_2,
-    BAR_3,
-    BAR_4,
-    BAR_5,
-    BAR_6,
-    BAR_7,
-    DISP_INC,    // Increments display digit
-    DISP_CLR,    // Clears display
-};
+void matrix_scan_user(void) {
+    // no further updates → displays stay off
+}
 
+enum _layer {
   _BASE,
   _FN
 };

@@ -2,5 +2,4 @@ VIA_ENABLE = yes
 VIAL_ENABLE = yes
 VIAL_INSECURE = yes
 DYNAMIC_MACRO_ENABLE = yes
-
-LED_MATRIX_ENABLE = yes
+SRC += bar_led.c

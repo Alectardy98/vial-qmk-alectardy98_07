@@ -25,22 +25,18 @@
 #define AUDIO_VOICES
 #define MUSIC_MAP
 
-//
-// 74HC595 bar‐graph shift register pins:
-//   – SER = serial data in
-//   – SRCLK = shift clock
-//   – RCLK = latch clock (sometimes called “STCP”)
-//
-#define HC595_SER_PIN    GP3
-#define HC595_SRCLK_PIN  GP4
-#define HC595_RCLK_PIN   GP5
+#pragma once
 
 //
-// MAX7219 8-digit display driver pins:
-//   – CLK  = clock
-//   – DIN  = serial data in
-//   – LOAD = chip‐select / latch
+// 74HC595 bar‐graph shift register pins (active-low LEDs):
 //
-#define MAX7219_CLK_PIN  GP6
-#define MAX7219_DIN_PIN  GP7
-#define MAX7219_LOAD_PIN GP8
+#define HC595_SER_PIN    GP3   // SER → DI on 74HC595
+#define HC595_SRCLK_PIN  GP4   // SHCP on 74HC595
+#define HC595_RCLK_PIN   GP5   // STCP (latch) on 74HC595
+
+//
+// MAX7219 8-digit driver pins:
+//
+#define MAX7219_CLK_PIN  GP6   // CLK on MAX7219
+#define MAX7219_DIN_PIN  GP7   // DIN on MAX7219
+#define MAX7219_LOAD_PIN GP8   // CS / LOAD on MAX7219
