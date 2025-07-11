@@ -1,4 +1,6 @@
 #pragma once
+#include <stdbool.h>
+#include <stdint.h>
 
 void bar_led_init(void);
 void bar_led_write(uint8_t val);
