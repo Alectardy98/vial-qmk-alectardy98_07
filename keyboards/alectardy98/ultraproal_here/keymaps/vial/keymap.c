@@ -20,6 +20,14 @@ enum _layer {
   _BASE,
   _FN
 };
+
+
+
+#include "quantum.h"
+#include "timer.h"
+
+
+
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 [_BASE] = LAYOUT(

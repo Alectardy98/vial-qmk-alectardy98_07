@@ -1,4 +1,4 @@
-/* Copyright 2022 Jose Pablo Ramirez <jp.ramangulo@gmail.com>
+/* Copyright 2022 Alectardy98
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,10 +16,7 @@
 
 #pragma once
 
-#include_next <mcuconf.h>
+#define MAX7219_DIN_PIN  D1  // PD2
+#define MAX7219_CLK_PIN  D0  // PD3
+#define MAX7219_LOAD_PIN D4  // PD4
 
-#undef RP_PWM_USE_PWM0
-#define RP_PWM_USE_PWM0                 TRUE
-
-#undef RP_SPI_USE_SPI0
-#define RP_SPI_USE_SPI0 TRUE

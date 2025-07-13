@@ -27,13 +27,12 @@
 
 
 // —— 74HC595 pins ——
-// Serial data in (DS)
 #define BAR_SER_PIN    GP3
-// Shift clock (SHCP)
 #define BAR_SRCLK_PIN  GP1
-// Latch clock (STCP)
 #define BAR_RCLK_PIN   GP2
 
-#define MAX_DIN_PIN   GP7
-#define MAX_CLK_PIN   GP8
-#define MAX_CS_PIN    GP6
+
+#define SPI_DRIVER        SPID0
+#define MAX7219_DIN_PIN   GP7   // Data in (DIN)
+#define MAX7219_CLK_PIN   GP6   // Clock (CLK)
+#define MAX7219_CS_PIN    GP8   // Chip select / LOAD (CS)

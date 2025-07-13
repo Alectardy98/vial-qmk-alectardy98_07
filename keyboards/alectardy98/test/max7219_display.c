@@ -32,13 +32,13 @@ void max7219_init(void) {
 
     wait_ms(50);
 
-    max7219_send(0x0F, 0x00); // Display test: off
+    max7219_send(0x0F, 0x00); // Display test OFF
     max7219_send(0x0C, 0x01); // Shutdown register: normal operation
     max7219_send(0x0B, 0x07); // Scan limit = 8 digits
     max7219_send(0x0A, 0x0F); // Intensity = max
-    max7219_send(0x09, 0x00); // Decode mode = none
+    max7219_send(0x09, 0x00); // Decode mode: none
 
-    // Clear all digits
+    // Clear digits
     for (uint8_t i = 1; i <= 8; i++) {
         max7219_send(i, 0x00);
     }
