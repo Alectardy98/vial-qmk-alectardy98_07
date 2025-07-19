@@ -4,10 +4,11 @@
 #include "quantum.h"
 #include "print.h"    // for xprintf()
 #include "config.h"   // for SERIAL_UART_BAUD
-#include "timer.h"    // for timer_read32()
 
 #define GHOST_PREFIX 0xFF
 #define GHOST_CODE   0x41
+#define MAX_ACTIVE   16
+#define GHOST_THRESHOLD 2
 
 // — scan→pos map (0xFF = ignore) —
 static const uint8_t sc_to_pos[256] = {
@@ -123,10 +124,10 @@ static const uint8_t sc_to_pos[256] = {
 };
 
 static matrix_row_t matrix[MATRIX_ROWS];
-static uint8_t      last_sc = 0xFF;
-static uint32_t     hold_timer = 0;
+static uint8_t  active_codes[MAX_ACTIVE];
+static uint8_t  active_ghosts[MAX_ACTIVE];
+static uint8_t  active_count = 0;
 
-//—— AVR‑UART wrapper ——//
 void uart_init(uint32_t baud) {
     uint16_t ubrr = (F_CPU / (16UL * baud)) - 1;
     UBRR1L = (uint8_t)ubrr;
@@ -147,53 +148,74 @@ void matrix_init(void) {
     for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
         matrix[r] = 0;
     }
-    last_sc = 0xFF;
-    hold_timer = 0;
+    active_count = 0;
     uart_init(SERIAL_UART_BAUD);
 }
 
 uint8_t matrix_scan(void) {
-    uint32_t now = timer_read32();
-    // release held key after timeout, but only for non-3x codes
-    if (last_sc != 0xFF && ((last_sc & 0xF0) != 0x30) && now >= hold_timer) {
-        uint8_t pos = sc_to_pos[last_sc];
-        if (pos != 0xFF) {
-            matrix[pos >> 4] &= ~(1u << (pos & 0x0F));
-            xprintf("TO:%02X →TIMEOUT r%u,c%u\n", last_sc, pos >> 4, pos & 0x0F);
-        }
-        last_sc = 0xFF;
-    }
-
     static bool drop_next_ghost = false;
+    // Process all incoming UART codes
     while (uart_available()) {
         uint8_t code = uart_read();
 
-        // ghost‐dropping
+        // Ghost dropping logic
         if (drop_next_ghost) {
             drop_next_ghost = false;
-            if (code == GHOST_CODE) continue;
+            if (code == GHOST_CODE) {
+                // Increment ghost counters for all active codes
+                for (uint8_t i = 0; i < active_count; i++) {
+                    active_ghosts[i]++;
+                }
+                // Break any keys whose ghost count reached threshold
+                for (uint8_t i = 0; i < active_count; ) {
+                    if (active_ghosts[i] >= GHOST_THRESHOLD) {
+                        uint8_t gc = active_codes[i];
+                        uint8_t pos = sc_to_pos[gc];
+                        if (pos != 0xFF) {
+                            matrix[pos >> 4] &= ~(1u << (pos & 0x0F));
+                            xprintf("GB:%02X →GHOST-BREAK r%u,c%u\n", gc, pos>>4, pos&0x0F);
+                        }
+                        // Remove from active list
+                        for (uint8_t j = i; j < active_count - 1; j++) {
+                            active_codes[j]  = active_codes[j+1];
+                            active_ghosts[j] = active_ghosts[j+1];
+                        }
+                        active_count--;
+                    } else {
+                        i++;
+                    }
+                }
+                continue;
+            }
         }
         if (code == GHOST_PREFIX) {
             drop_next_ghost = true;
             continue;
         }
 
-        // explicit break codes Bx for make codes 3x
+        // Explicit break codes (B* for 3x makes)
         if ((code & 0xF0) == 0xB0) {
-            uint8_t make_code = 0x30 | (code & 0x0F);
-            uint8_t pos = sc_to_pos[make_code];
+            uint8_t make = 0x30 | (code & 0x0F);
+            uint8_t pos = sc_to_pos[make];
             if (pos != 0xFF) {
                 matrix[pos >> 4] &= ~(1u << (pos & 0x0F));
-                xprintf("BR:%02X →BREAK r%u,c%u\n", code, pos >> 4, pos & 0x0F);
-                if (last_sc == make_code) {
-                    last_sc = 0xFF;
-                    hold_timer = 0;  // cancel pending timeout
+                xprintf("BR:%02X →BREAK r%u,c%u\n", code, pos>>4, pos&0x0F);
+            }
+            // Remove from active list if present
+            for (uint8_t i = 0; i < active_count; i++) {
+                if (active_codes[i] == make) {
+                    for (uint8_t j = i; j < active_count - 1; j++) {
+                        active_codes[j]  = active_codes[j+1];
+                        active_ghosts[j] = active_ghosts[j+1];
+                    }
+                    active_count--;
+                    break;
                 }
             }
             continue;
         }
 
-        // make codes
+        // Make codes
         xprintf("SC:%02X ", code);
         uint8_t pos = sc_to_pos[code];
         if (pos == 0xFF) {
@@ -202,27 +224,26 @@ uint8_t matrix_scan(void) {
         }
         uint8_t row = pos >> 4;
         uint8_t col = pos & 0x0F;
+        matrix[row] |= (1u << col);
+        xprintf("→MAKE r%u,c%u\n", row, col);
 
-        // release previous key if different
-        if (last_sc != 0xFF && last_sc != code) {
-            uint8_t old = sc_to_pos[last_sc];
-            if (old != 0xFF) {
-                matrix[old >> 4] &= ~(1u << (old & 0x0F));
+        // Only track ghost for non-3x makes
+        if ((code & 0xF0) != 0x30) {
+            bool found = false;
+            for (uint8_t i = 0; i < active_count; i++) {
+                if (active_codes[i] == code) {
+                    active_ghosts[i] = 0;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && active_count < MAX_ACTIVE) {
+                active_codes[active_count]  = code;
+                active_ghosts[active_count] = 0;
+                active_count++;
             }
         }
-
-        // press new key
-        matrix[row] |= (1u << col);
-        last_sc = code;
-
-        // reset timeout on new code (non-3x only)
-        if ((code & 0xF0) != 0x30) {
-            hold_timer = timer_read32() + 100;
-        }
-
-        xprintf("→MAKE r%u,c%u\n", row, col);
     }
-
     return 0;
 }
 
