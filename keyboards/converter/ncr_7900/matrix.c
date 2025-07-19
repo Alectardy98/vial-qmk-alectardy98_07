@@ -160,12 +160,25 @@ uint8_t matrix_scan(void) {
             if (code == GHOST_CODE) {
                 continue;
             }
-            // otherwise fall through to process this code
         }
 
         // if we see 0xFF, mark next for dropping and skip
         if (code == GHOST_PREFIX) {
             drop_next_ghost = true;
+            continue;
+        }
+
+        // handle explicit break codes Bx for make codes 3x
+        if ((code & 0xF0) == 0xB0) {
+            uint8_t make_code = 0x30 | (code & 0x0F);
+            uint8_t pos = sc_to_pos[make_code];
+            if (pos != 0xFF) {
+                matrix[pos >> 4] &= ~(1u << (pos & 0x0F));
+                xprintf("BR:%02X →BREAK r%u,c%u\n", code, pos >> 4, pos & 0x0F);
+                if (last_sc == make_code) {
+                    last_sc = 0xFF;
+                }
+            }
             continue;
         }
 
