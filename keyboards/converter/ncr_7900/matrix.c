@@ -4,6 +4,7 @@
 #include "quantum.h"
 #include "print.h"    // for xprintf()
 #include "config.h"   // for SERIAL_UART_BAUD
+#include "timer.h"    // for timer_read32()
 
 #define GHOST_PREFIX 0xFF
 #define GHOST_CODE   0x41
@@ -123,6 +124,7 @@ static const uint8_t sc_to_pos[256] = {
 
 static matrix_row_t matrix[MATRIX_ROWS];
 static uint8_t      last_sc = 0xFF;
+static uint32_t     hold_timer = 0;
 
 //—— AVR‑UART wrapper ——//
 void uart_init(uint32_t baud) {
@@ -146,29 +148,37 @@ void matrix_init(void) {
         matrix[r] = 0;
     }
     last_sc = 0xFF;
+    hold_timer = 0;
     uart_init(SERIAL_UART_BAUD);
 }
 
 uint8_t matrix_scan(void) {
+    uint32_t now = timer_read32();
+    // release held key after timeout, but only for non-3x codes
+    if (last_sc != 0xFF && ((last_sc & 0xF0) != 0x30) && now >= hold_timer) {
+        uint8_t pos = sc_to_pos[last_sc];
+        if (pos != 0xFF) {
+            matrix[pos >> 4] &= ~(1u << (pos & 0x0F));
+            xprintf("TO:%02X →TIMEOUT r%u,c%u\n", last_sc, pos >> 4, pos & 0x0F);
+        }
+        last_sc = 0xFF;
+    }
+
     static bool drop_next_ghost = false;
     while (uart_available()) {
         uint8_t code = uart_read();
 
-        // drop the code immediately following a 0xFF
+        // ghost‐dropping
         if (drop_next_ghost) {
             drop_next_ghost = false;
-            if (code == GHOST_CODE) {
-                continue;
-            }
+            if (code == GHOST_CODE) continue;
         }
-
-        // if we see 0xFF, mark next for dropping and skip
         if (code == GHOST_PREFIX) {
             drop_next_ghost = true;
             continue;
         }
 
-        // handle explicit break codes Bx for make codes 3x
+        // explicit break codes Bx for make codes 3x
         if ((code & 0xF0) == 0xB0) {
             uint8_t make_code = 0x30 | (code & 0x0F);
             uint8_t pos = sc_to_pos[make_code];
@@ -177,21 +187,19 @@ uint8_t matrix_scan(void) {
                 xprintf("BR:%02X →BREAK r%u,c%u\n", code, pos >> 4, pos & 0x0F);
                 if (last_sc == make_code) {
                     last_sc = 0xFF;
+                    hold_timer = 0;  // cancel pending timeout
                 }
             }
             continue;
         }
 
-        // print only actual scan codes
+        // make codes
         xprintf("SC:%02X ", code);
-
-        // map scan code to matrix position
         uint8_t pos = sc_to_pos[code];
         if (pos == 0xFF) {
             xprintf("→IGNORE\n");
             continue;
         }
-
         uint8_t row = pos >> 4;
         uint8_t col = pos & 0x0F;
 
@@ -202,12 +210,19 @@ uint8_t matrix_scan(void) {
                 matrix[old >> 4] &= ~(1u << (old & 0x0F));
             }
         }
+
         // press new key
         matrix[row] |= (1u << col);
         last_sc = code;
 
+        // reset timeout on new code (non-3x only)
+        if ((code & 0xF0) != 0x30) {
+            hold_timer = timer_read32() + 100;
+        }
+
         xprintf("→MAKE r%u,c%u\n", row, col);
     }
+
     return 0;
 }
 
