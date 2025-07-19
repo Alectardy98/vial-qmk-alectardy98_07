@@ -5,9 +5,10 @@
 #include "print.h"    // for xprintf()
 #include "config.h"   // for SERIAL_UART_BAUD
 
-#define GHOST_PREFIX 0xFF
-#define GHOST_CODE   0x41
-#define MAX_ACTIVE   16
+#define GHOST_PREFIX    0xFF
+#define GHOST_CODE      0x41
+#define NOISE_CODE      0x10
+#define MAX_ACTIVE      16
 #define GHOST_THRESHOLD 2
 
 // — scan→pos map (0xFF = ignore) —
@@ -122,10 +123,11 @@ static const uint8_t sc_to_pos[256] = {
     [0x6B] = 0xA6,
     [0x6C] = 0xA7,
 };
+
 static matrix_row_t matrix[MATRIX_ROWS];
-static uint8_t  active_codes[MAX_ACTIVE];
-static uint8_t  active_ghosts[MAX_ACTIVE];
-static uint8_t  active_count = 0;
+static uint8_t      active_codes[MAX_ACTIVE];
+static uint8_t      active_ghosts[MAX_ACTIVE];
+static uint8_t      active_count = 0;
 
 void uart_init(uint32_t baud) {
     uint16_t ubrr = (F_CPU / (16UL * baud)) - 1;
@@ -157,37 +159,41 @@ uint8_t matrix_scan(void) {
     while (uart_available()) {
         uint8_t code = uart_read();
 
-        // filter noise: ignore 0x10 if already two keys pressed
-        if (code == 0x10) {
+        // debug: incoming scan code
+        xprintf("SCODE:%02X\n", code);
+
+        // noise filter: ignore NOISE_CODE if already two or more keys pressed
+        if (code == NOISE_CODE) {
             uint8_t total = 0;
             for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
                 total += __builtin_popcount(matrix[r]);
             }
             if (total >= 2) {
-                xprintf("SC:%02X →IGNORE NOISE\n", code);
+                xprintf("SC:%02X ->IGNORE NOISE\n", code);
                 continue;
             }
         }
 
-        // handle ghost prefix/ghost code sequence
+        // handle ghost prefix
         if (saw_prefix) {
             saw_prefix = false;
             if (code == GHOST_CODE) {
-                // increment ghost counts
+                xprintf("GHOST_EVENT\n");
+                // increment ghost counters
                 for (uint8_t i = 0; i < active_count; i++) {
                     active_ghosts[i]++;
                 }
-                // break any keys at threshold
+                // break keys exceeding threshold
                 for (uint8_t i = 0; i < active_count; ) {
                     if (active_ghosts[i] >= GHOST_THRESHOLD) {
                         uint8_t gc = active_codes[i];
                         uint8_t pos = sc_to_pos[gc];
                         if (pos != 0xFF) {
                             matrix[pos>>4] &= ~(1u << (pos&0x0F));
-                            xprintf("GB:%02X →GHOST-BREAK r%u,c%u\n", gc, pos>>4, pos&0x0F);
+                            xprintf("GB:%02X ->GHOST-BREAK r%u,c%u\n", gc, pos>>4, pos&0x0F);
                         }
                         // remove entry
-                        for (uint8_t j = i; j < active_count-1; j++) {
+                        for (uint8_t j = i; j < active_count - 1; j++) {
                             active_codes[j]  = active_codes[j+1];
                             active_ghosts[j] = active_ghosts[j+1];
                         }
@@ -198,25 +204,26 @@ uint8_t matrix_scan(void) {
                 }
                 continue;
             }
-            // stray code: fall through and reset
+            // stray code after prefix resets state
         }
         if (code == GHOST_PREFIX) {
             saw_prefix = true;
             continue;
         }
 
-        // explicit break codes (B* for 3x makes)
+        // explicit break codes Bx for 3x make codes
         if ((code & 0xF0) == 0xB0) {
+            xprintf("BR:%02X\n", code);
             uint8_t make = 0x30 | (code & 0x0F);
             uint8_t pos = sc_to_pos[make];
             if (pos != 0xFF) {
                 matrix[pos>>4] &= ~(1u << (pos&0x0F));
-                xprintf("BR:%02X →BREAK r%u,c%u\n", code, pos>>4, pos&0x0F);
+                xprintf("->BREAK r%u,c%u\n", pos>>4, pos&0x0F);
             }
             // remove from active list
             for (uint8_t i = 0; i < active_count; i++) {
                 if (active_codes[i] == make) {
-                    for (uint8_t j = i; j < active_count-1; j++) {
+                    for (uint8_t j = i; j < active_count - 1; j++) {
                         active_codes[j]  = active_codes[j+1];
                         active_ghosts[j] = active_ghosts[j+1];
                     }
@@ -228,19 +235,19 @@ uint8_t matrix_scan(void) {
         }
 
         // make codes
-        xprintf("SC:%02X ", code);
+        xprintf("MAKE_CODE:%02X\n", code);
         uint8_t pos = sc_to_pos[code];
         if (pos == 0xFF) {
-            xprintf("→IGNORE\n");
+            xprintf("->IGNORE\n");
             continue;
         }
         uint8_t row = pos >> 4;
         uint8_t col = pos & 0x0F;
         matrix[row] |= (1u << col);
-        xprintf("→MAKE r%u,c%u\n", row, col);
+        xprintf("->MAKE r%u,c%u\n", row, col);
 
-        // track ghost only for non-3x codes
-        if ((code & 0xF0) != 0x30) {
+        // ghost-tracking exception for release codes 0x32-0x38
+        if (code < 0x32 || code > 0x38) {
             bool found = false;
             for (uint8_t i = 0; i < active_count; i++) {
                 if (active_codes[i] == code) {
