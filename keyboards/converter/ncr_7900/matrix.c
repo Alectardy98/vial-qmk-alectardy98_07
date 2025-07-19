@@ -122,7 +122,6 @@ static const uint8_t sc_to_pos[256] = {
     [0x6B] = 0xA6,
     [0x6C] = 0xA7,
 };
-
 static matrix_row_t matrix[MATRIX_ROWS];
 static uint8_t  active_codes[MAX_ACTIVE];
 static uint8_t  active_ghosts[MAX_ACTIVE];
@@ -153,30 +152,42 @@ void matrix_init(void) {
 }
 
 uint8_t matrix_scan(void) {
-    static bool drop_next_ghost = false;
-    // Process all incoming UART codes
+    static bool saw_prefix = false;
+
     while (uart_available()) {
         uint8_t code = uart_read();
 
-        // Ghost dropping logic
-        if (drop_next_ghost) {
-            drop_next_ghost = false;
+        // filter noise: ignore 0x10 if already two keys pressed
+        if (code == 0x10) {
+            uint8_t total = 0;
+            for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
+                total += __builtin_popcount(matrix[r]);
+            }
+            if (total >= 2) {
+                xprintf("SC:%02X →IGNORE NOISE\n", code);
+                continue;
+            }
+        }
+
+        // handle ghost prefix/ghost code sequence
+        if (saw_prefix) {
+            saw_prefix = false;
             if (code == GHOST_CODE) {
-                // Increment ghost counters for all active codes
+                // increment ghost counts
                 for (uint8_t i = 0; i < active_count; i++) {
                     active_ghosts[i]++;
                 }
-                // Break any keys whose ghost count reached threshold
+                // break any keys at threshold
                 for (uint8_t i = 0; i < active_count; ) {
                     if (active_ghosts[i] >= GHOST_THRESHOLD) {
                         uint8_t gc = active_codes[i];
                         uint8_t pos = sc_to_pos[gc];
                         if (pos != 0xFF) {
-                            matrix[pos >> 4] &= ~(1u << (pos & 0x0F));
+                            matrix[pos>>4] &= ~(1u << (pos&0x0F));
                             xprintf("GB:%02X →GHOST-BREAK r%u,c%u\n", gc, pos>>4, pos&0x0F);
                         }
-                        // Remove from active list
-                        for (uint8_t j = i; j < active_count - 1; j++) {
+                        // remove entry
+                        for (uint8_t j = i; j < active_count-1; j++) {
                             active_codes[j]  = active_codes[j+1];
                             active_ghosts[j] = active_ghosts[j+1];
                         }
@@ -187,24 +198,25 @@ uint8_t matrix_scan(void) {
                 }
                 continue;
             }
+            // stray code: fall through and reset
         }
         if (code == GHOST_PREFIX) {
-            drop_next_ghost = true;
+            saw_prefix = true;
             continue;
         }
 
-        // Explicit break codes (B* for 3x makes)
+        // explicit break codes (B* for 3x makes)
         if ((code & 0xF0) == 0xB0) {
             uint8_t make = 0x30 | (code & 0x0F);
             uint8_t pos = sc_to_pos[make];
             if (pos != 0xFF) {
-                matrix[pos >> 4] &= ~(1u << (pos & 0x0F));
+                matrix[pos>>4] &= ~(1u << (pos&0x0F));
                 xprintf("BR:%02X →BREAK r%u,c%u\n", code, pos>>4, pos&0x0F);
             }
-            // Remove from active list if present
+            // remove from active list
             for (uint8_t i = 0; i < active_count; i++) {
                 if (active_codes[i] == make) {
-                    for (uint8_t j = i; j < active_count - 1; j++) {
+                    for (uint8_t j = i; j < active_count-1; j++) {
                         active_codes[j]  = active_codes[j+1];
                         active_ghosts[j] = active_ghosts[j+1];
                     }
@@ -215,7 +227,7 @@ uint8_t matrix_scan(void) {
             continue;
         }
 
-        // Make codes
+        // make codes
         xprintf("SC:%02X ", code);
         uint8_t pos = sc_to_pos[code];
         if (pos == 0xFF) {
@@ -227,7 +239,7 @@ uint8_t matrix_scan(void) {
         matrix[row] |= (1u << col);
         xprintf("→MAKE r%u,c%u\n", row, col);
 
-        // Only track ghost for non-3x makes
+        // track ghost only for non-3x codes
         if ((code & 0xF0) != 0x30) {
             bool found = false;
             for (uint8_t i = 0; i < active_count; i++) {
