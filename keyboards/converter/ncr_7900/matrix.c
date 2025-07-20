@@ -9,7 +9,7 @@
 #define GHOST_CODE      0x41
 #define NOISE_CODE      0x10
 #define MAX_ACTIVE      16
-#define GHOST_THRESHOLD 2
+#define GHOST_THRESHOLD 1
 
 // — scan→pos map (0xFF = ignore) —
 static const uint8_t sc_to_pos[256] = {
