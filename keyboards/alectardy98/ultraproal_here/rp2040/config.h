@@ -33,6 +33,7 @@
 
 
 #define SPI_DRIVER        SPID0
-#define MAX7219_DIN_PIN   GP7   // Data in (DIN)
-#define MAX7219_CLK_PIN   GP6   // Clock (CLK)
+
+#define SPI_MOSI_PIN    GP7   // Data in (DIN)
+#define SPI_SCK_PIN    GP6   // Clock (CLK)
 #define MAX7219_CS_PIN    GP8   // Chip select / LOAD (CS)

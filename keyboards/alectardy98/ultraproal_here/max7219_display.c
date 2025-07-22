@@ -3,8 +3,8 @@
 #include <stdint.h>
 
 // Pin aliases from config.h
-#define CS_PIN   MAX7219_CS_PIN
-#define CLK_PIN  MAX7219_CLK_PIN
+#define CS_PIN   SPI_MOSI_PIN
+#define CLK_PIN  SPI_SCK_PIN
 #define DIN_PIN  MAX7219_DIN_PIN
 
 // Pulse a pin high→low
