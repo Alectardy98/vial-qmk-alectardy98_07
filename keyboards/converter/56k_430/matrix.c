@@ -27,7 +27,6 @@ static uint8_t serialRead(void) {
     while (!(UCSR1A & (1 << RXC1)));
     return UDR1;
 }
-
 // -----------------------------------------------------------------------------
 // Scan code → position lookup: single-byte mapping 0xFF = ignore
 // -----------------------------------------------------------------------------
@@ -144,29 +143,45 @@ static const uint8_t sc_to_pos_full[256] = {
     [0x87] = 0x69,
     [0xC2] = 0x6A,
 };
-
 static matrix_row_t matrix[MATRIX_ROWS];
+static uint32_t startup_time;
 
 void matrix_init(void) {
     serialInit();                            // initialize UART1 @ SERIAL_UART_BAUD
+    startup_time = timer_read();             // record start time
     for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
         matrix[r] = 0;
     }
 }
 
 uint8_t matrix_scan(void) {
+    // ignore any scancodes for the first 1000 ms
+    if (timer_elapsed(startup_time) < 1000) {
+        while (serialAvailable()) {
+            (void)serialRead();               // flush garbage
+        }
+        return 0;
+    }
+
     while (serialAvailable()) {
         uint8_t code = serialRead();
-        xprintf("Got raw 0x%02X\n", code);
+        xprintf("Raw byte: 0x%02X\n", code);
+
         bool pressed = (code & 0x80) != 0;     // MSB=1 → make, 0 → break
         uint8_t idx = pressed
-            ? code                              // use make code directly
-            : (uint8_t)((code & 0x7F) | 0x80);  // reconstruct make code on break
+            ? code                              // make code
+            : (uint8_t)((code & 0x7F) | 0x80);  // reconstruct make on break
         uint8_t pos = sc_to_pos_full[idx];     // lookup row/col
-        if (pos == 0xFE) continue;
+
+        if (pos == 0xFF) {
+            xprintf("Unmapped code: 0x%02X\n", idx);
+            continue;
+        }
+
         uint8_t row = pos >> 4;
         uint8_t col = pos & 0x0F;
-        matrix_row_t mask = (matrix_row_t)1 << col;
+        matrix_row_t mask = ((matrix_row_t)1 << col);
+
         if (pressed) {
             matrix[row] |= mask;
             xprintf("Make:  row %u, col %u\n", row, col);
@@ -182,4 +197,10 @@ matrix_row_t matrix_get_row(uint8_t row) {
     return matrix[row];
 }
 
-void matrix_print(void) { }
+void matrix_print(void) {
+    xprintf("--- UART FIFO Dump ---\n");
+    while (serialAvailable()) {
+        uint8_t code = serialRead();
+        xprintf("Raw byte: 0x%02X\n", code);
+    }
+}
