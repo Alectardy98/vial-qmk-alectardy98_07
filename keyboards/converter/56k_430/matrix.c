@@ -1,24 +1,26 @@
 #include "quantum.h"
 #include "print.h"       // for xprintf()
 #include "config.h"      // for MATRIX_ROWS, MATRIX_COLS, SERIAL_UART_BAUD
+#include "timer.h"       // for timer_read(), timer_elapsed()
 
 #include <avr/io.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <util/delay.h>
 
 // -----------------------------------------------------------------------------
-// Mini-AVR UART1 driver @ SERIAL_UART_BAUD
+// AVR UART1 bit-rate setup and RX driver at SERIAL_UART_BAUD
 // -----------------------------------------------------------------------------
 static void serialInit(void) {
     uint16_t ubrr = (F_CPU / (16UL * SERIAL_UART_BAUD)) - 1;
-    UBRR1H = ubrr >> 8;
+    UBRR1H = (ubrr >> 8) & 0xFF;
     UBRR1L = ubrr & 0xFF;
-    UCSR1B = (1 << RXEN1);                    // RX enable
-    UCSR1C = (1 << UCSZ11) | (1 << UCSZ10);   // 8 data bits, no parity, 1 stop bit
+    UCSR1B = (1 << RXEN1);                  // enable RX
+    UCSR1C = (1 << UCSZ11) | (1 << UCSZ10); // 8 data bits, no parity, 1 stop bit
 }
 
 static bool serialAvailable(void) {
-    return (UCSR1A & (1 << RXC1));
+    return (UCSR1A & (1 << RXC1));          // data received
 }
 
 static uint8_t serialRead(void) {
@@ -146,7 +148,7 @@ static const uint8_t sc_to_pos_full[256] = {
 static matrix_row_t matrix[MATRIX_ROWS];
 
 void matrix_init(void) {
-    serialInit();
+    serialInit();                            // initialize UART1 @ SERIAL_UART_BAUD
     for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
         matrix[r] = 0;
     }
@@ -156,22 +158,24 @@ uint8_t matrix_scan(void) {
     while (serialAvailable()) {
         uint8_t code = serialRead();
         xprintf("Got raw 0x%02X\n", code);
-        bool pressed = code & 0x80;
-        uint8_t idx = pressed ? code : ((code & 0x7F) | 0x80);
-        uint8_t pos = sc_to_pos_full[idx];
-        if (pos == 0xFF) continue;
+        bool pressed = (code & 0x80) != 0;     // MSB=1 → make, 0 → break
+        uint8_t idx = pressed
+            ? code                              // use make code directly
+            : (uint8_t)((code & 0x7F) | 0x80);  // reconstruct make code on break
+        uint8_t pos = sc_to_pos_full[idx];     // lookup row/col
+        if (pos == 0xFE) continue;
         uint8_t row = pos >> 4;
         uint8_t col = pos & 0x0F;
-        matrix_row_t mask = ((matrix_row_t)1 << col);
+        matrix_row_t mask = (matrix_row_t)1 << col;
         if (pressed) {
             matrix[row] |= mask;
-            xprintf("Make: row %u col %u\n", row, col);
+            xprintf("Make:  row %u, col %u\n", row, col);
         } else {
             matrix[row] &= ~mask;
-            xprintf("Break: row %u col %u\n", row, col);
+            xprintf("Break: row %u, col %u\n", row, col);
         }
     }
-    return 0;
+    return 0;  // ignored by converter
 }
 
 matrix_row_t matrix_get_row(uint8_t row) {
