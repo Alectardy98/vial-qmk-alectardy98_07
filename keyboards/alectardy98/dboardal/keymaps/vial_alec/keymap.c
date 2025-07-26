@@ -18,9 +18,37 @@
 
 enum layer_names {
     _BASE,
+    _NUM,
     _MOUSE,
     _FN
 };
+
+bool led_update_kb(led_t led_state) {
+    if (!led_update_user(led_state)) {
+        return false; // Respect user override
+    }
+        if (layer_state_is(_NUM)) {              // Force Num Lock LED On when in NUM layer
+        writePin(D1, true);
+    } else {
+        writePin(D1, false);
+    }
+        if (layer_state_is(_FN)) {              // Force Num Lock LED On when in NUM layer
+        writePin(D0, true);
+        writePin(D1, true);
+        writePin(D2, true);
+        writePin(D3, true);
+        writePin(D5, true);
+    } else {
+        writePin(D0, false);
+        writePin(D1, false);
+        writePin(D2, false);
+        writePin(D3, false);
+        writePin(D5, false);
+    }
+    writePin(D3, led_state.caps_lock);
+    return true;
+}
+
 
 enum blender_keycode {
     TEST = QK_KB_0,
@@ -192,6 +220,15 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         KC_LSFT,    KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH, KC_NUBS, KC_RSFT,                      KC_LEFT, KC_RGHT, \
         KC_LALT, KC_LGUI, MO(_FN), KC_LCTL,        LT(_MOUSE, KC_SPC),  KC_SPC,          KC_BSPC,          KC_RALT, KC_CAPS,                      KC_DOWN,          \
                                                               KC_LSFT, KC_RSFT                                                                                      \
+        ),
+    [_NUM] = LAYOUT(
+        _______, _______,          _______, _______, _______, _______, _______,          _______, _______, _______, _______, _______,             _______, _______, \
+        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,    _______, _______, \
+        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,             _______, _______, \
+        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                      _______,          \
+        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                      _______, _______, \
+        _______, _______, _______, _______,          _______,          _______,          _______,          _______, _______,                      _______,          \
+                                                              _______, _______                                                                                      \
         ),
     [_MOUSE] = LAYOUT(
         _______, _______,          _______, _______, _______, _______, _______,          _______, _______, _______, _______, _______,             _______, _______, \
