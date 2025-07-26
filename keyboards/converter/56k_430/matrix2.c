@@ -6,26 +6,36 @@
 #include <stdint.h>
 
 // --------------------------------------------------------------------------
-// UART1 RX/TX driver @ SERIAL_UART_BAUD, 8‑N‑1
+// UART1 RX/TX driver @ SERIAL_UART_BAUD, 8-N-1
 // --------------------------------------------------------------------------
 static void serial_init(void) {
     uint16_t ubrr = (F_CPU / (16UL * SERIAL_UART_BAUD)) - 1;
     UBRR1H = (ubrr >> 8) & 0xFF;
     UBRR1L =  ubrr        & 0xFF;
-    UCSR1B = (1 << RXEN1) | (1 << TXEN1);   // enable RX1 & TX1
-    UCSR1C = (1 << UCSZ11) | (1 << UCSZ10); // 8 data bits, no parity, 1 stop bit
+    // enable both RX1 and TX1
+    UCSR1B = (1 << RXEN1) | (1 << TXEN1);
+    // 8 data bits, no parity, 1 stop bit
+    UCSR1C = (1 << UCSZ11) | (1 << UCSZ10);
 }
 
 // --------------------------------------------------------------------------
-// UART1 TX helper
+// UART1 helpers
 // --------------------------------------------------------------------------
+static inline bool serial_available(void) {
+    return (UCSR1A & (1 << RXC1));
+}
+
+static inline uint8_t serial_read(void) {
+    while (!(UCSR1A & (1 << RXC1)));
+    return UDR1;
+}
+
 static inline void serial_write(uint8_t b) {
     while (!(UCSR1A & (1 << UDRE1)));
     UDR1 = b;
     while (!(UCSR1A & (1 << TXC1)));
     UCSR1A |= (1 << TXC1);
 }
-
 
 // -----------------------------------------------------------------------------
 // Scan code → position lookup: single-byte mapping 0xFF = ignore
@@ -145,40 +155,67 @@ static const uint8_t sc_to_pos_full[256] = {
 };
 static matrix_row_t matrix[MATRIX_ROWS];
 
-// -----------------------------------------------------------------------------
-// walt_send_led_mask
-// Sends a single‐byte mask (0x00–0x03) on the W line to drive LEDs.
-// -----------------------------------------------------------------------------
-void walt_send_led_mask(uint8_t mask) {
-    // Hardware should hold WALT_ENABLE_PIN low permanently.
-    serial_write(mask & 0x03);
-    wait_ms(2);
-}
-
 // --------------------------------------------------------------------------
-// matrix_init: initialise UART & clear matrix state
+// matrix_init: run test harness then clear state
 // --------------------------------------------------------------------------
 void matrix_init(void) {
     serial_init();
+
+    // 1) hold Enable low so keyboard is always active
+    setPinOutput(WALT_ENABLE_PIN);
+    writePinLow(WALT_ENABLE_PIN);
+
+    // 2) brute‑force every two‑byte combination on W (TX1), logging each
+    for (uint32_t combo = 0; combo < 65536; combo++) {
+        uint8_t hi = (combo >> 8) & 0xFF;
+        uint8_t lo = combo & 0xFF;
+        xprintf("TX pair: 0x%02X 0x%02X\n", hi, lo);
+        serial_write(hi);
+        serial_write(lo);
+        wait_ms(250);
+    }
+
+    // 3) disable UART TX so we can bit‑bang pulses on that pin
+    UCSR1B &= ~(1 << TXEN1);
+    setPinOutput(WALT_CMD_PIN);
+
+    // 4) pulse the W pin at various frequencies, switching every 0.25 s
+    const uint16_t freqs[] = { 1, 2, 4, 8, 16, 32 };
+    for (size_t i = 0; i < sizeof(freqs)/sizeof(freqs[0]); i++) {
+        uint16_t f = freqs[i];
+        xprintf("Pulse at %u Hz\n", f);
+        uint16_t half_period = 500 / f;  // half‑period in ms
+        uint16_t cycles = f;             // one second worth of pulses
+        for (uint16_t c = 0; c < cycles; c++) {
+            writePinHigh(WALT_CMD_PIN);
+            wait_ms(half_period);
+            writePinLow(WALT_CMD_PIN);
+            wait_ms(half_period);
+        }
+        // wait .25 s before next frequency
+        wait_ms(250);
+    }
+
+    // 5) fall through to normal matrix scanning: clear state
     for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
         matrix[r] = 0;
     }
 }
 
 // --------------------------------------------------------------------------
-// matrix_scan: read & log incoming scan codes
+// matrix_scan: read keys normally after test harness
 // --------------------------------------------------------------------------
 uint8_t matrix_scan(void) {
     static uint8_t drop_left = 2;
-    while (UCSR1A & (1 << RXC1)) {
-        uint8_t code = UDR1;
+
+    while (serial_available()) {
+        uint8_t code = serial_read();
         xprintf("Raw byte: 0x%02X\n", code);
         if (drop_left && code == 0x00) {
             drop_left--;
             continue;
         }
         drop_left = 0;
-
         bool pressed = (code & 0x80);
         uint8_t idx = pressed ? code : ((code & 0x7F) | 0x80);
         uint8_t pos = sc_to_pos_full[idx];
@@ -186,14 +223,13 @@ uint8_t matrix_scan(void) {
             xprintf("Unmapped code: 0x%02X\n", idx);
             continue;
         }
-
         uint8_t row = pos >> 4, col = pos & 0x0F;
-        matrix_row_t m = ((matrix_row_t)1 << col);
+        matrix_row_t mask = (matrix_row_t)1 << col;
         if (pressed) {
-            matrix[row] |= m;
-            xprintf("Make: row %u, col %u\n", row, col);
+            matrix[row] |= mask;
+            xprintf("Make:  row %u, col %u\n", row, col);
         } else {
-            matrix[row] &= ~m;
+            matrix[row] &= ~mask;
             xprintf("Break: row %u, col %u\n", row, col);
         }
     }
@@ -206,7 +242,7 @@ matrix_row_t matrix_get_row(uint8_t row) {
 
 void matrix_print(void) {
     xprintf("--- FIFO Dump ---\n");
-    while (UCSR1A & (1 << RXC1)) {
-        xprintf("Residual: 0x%02X\n", UDR1);
+    while (serial_available()) {
+        xprintf("Residual: 0x%02X\n", serial_read());
     }
 }

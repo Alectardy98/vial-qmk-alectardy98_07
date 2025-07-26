@@ -1,10 +1,14 @@
 #include QMK_KEYBOARD_H
+#include "print.h"  // for xprintf()
 
-enum layer_names {
+// Expose the LED helper from matrix.c
+extern void walt_send_led_mask(uint8_t mask);
+
+// Layers
+enum layers {
     _BASE,
     _FN
 };
-
 
 
 
@@ -31,3 +35,30 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         ),
 
 };
+// Update layer state and force an LED update
+layer_state_t layer_state_set_user(layer_state_t state) {
+    // Trigger our LED handler with the current CapsLock state
+    led_update_kb(host_keyboard_led_state());
+    return state;
+}
+
+// Override the QMK LED update to drive the W line instead of GPIO
+bool led_update_kb(led_t led_state) {
+    // bit0 = Caps LED, bit1 = FN LED
+    uint8_t mask = 0;
+    if (led_state.caps_lock)       mask |= 0x01;
+    if (layer_state_is(_FN))       mask |= 0x02;
+
+    xprintf("WALT LED mask = 0x%02X\n", mask);
+    walt_send_led_mask(mask);
+    return false;  // skip QMK's default GPIO LED handling
+}
+
+// Let KC_F toggle the FN layer
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (keycode == KC_F && record->event.pressed) {
+        layer_invert(_FN);
+        return false;
+    }
+    return true;
+}
