@@ -1,12 +1,27 @@
 #include "quantum.h"
-#include "print.h"
+#include "print.h"       // for xprintf()
 #include "config.h"
 #include <avr/io.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-// UART1 RX/TX setup
-static void serial_init(void) {
+// --------------------------------------------------
+// Init UART1 TX only at given baud
+// --------------------------------------------------
+static void uart1_init_tx(uint32_t baud) {
+    uint16_t ubrr = (F_CPU / (16UL * baud)) - 1;
+    UBRR1H = (ubrr >> 8) & 0xFF;
+    UBRR1L =  ubrr        & 0xFF;
+    // disable RX, enable TX only
+    UCSR1B = (1 << TXEN1);
+    // 8‑N‑1
+    UCSR1C = (1 << UCSZ11) | (1 << UCSZ10);
+}
+
+// --------------------------------------------------
+// Init UART1 RX+TX at scan‑code baud
+// --------------------------------------------------
+static void uart1_init_both(void) {
     uint16_t ubrr = (F_CPU / (16UL * SERIAL_UART_BAUD)) - 1;
     UBRR1H = (ubrr >> 8) & 0xFF;
     UBRR1L =  ubrr        & 0xFF;
@@ -14,19 +29,20 @@ static void serial_init(void) {
     UCSR1C = (1 << UCSZ11) | (1 << UCSZ10);
 }
 
-// Globally visible TX function
-void serial_write(uint8_t b) {
+// --------------------------------------------------------------------------
+// UART1 TX helper
+// --------------------------------------------------------------------------
+static inline void serial_write(uint8_t b) {
     while (!(UCSR1A & (1 << UDRE1)));
     UDR1 = b;
     while (!(UCSR1A & (1 << TXC1)));
     UCSR1A |= (1 << TXC1);
 }
 
-// Globally visible LED sender (low 2 bits only)
-void walt_send_led_mask(uint8_t mask) {
-    serial_write(mask & 0x03);
-    wait_ms(2);
-}
+// -----------------------------------------------------------------------------
+// Scan code → position lookup (0xFF = ignore)
+// -----------------------------------------------------------------------------
+
 
 // -----------------------------------------------------------------------------
 // Scan code → position lookup: single-byte mapping 0xFF = ignore
@@ -146,40 +162,71 @@ static const uint8_t sc_to_pos_full[256] = {
 };
 static matrix_row_t matrix[MATRIX_ROWS];
 
+// --------------------------------------------------------------------------
+// Gate‑and‑send a single byte at 4800 baud
+// --------------------------------------------------------------------------
+static void send_one_byte(uint8_t cmd) {
+    // Switch to 4800 baud, TX only
+    uart1_init_tx(4800);
+
+    // Enable keyboard, send, then disable
+    writePinLow (WALT_ENABLE_PIN);
+    wait_ms(5);
+    xprintf("TX byte: 0x%02X\n", cmd);
+    serial_write(cmd);
+    wait_ms(5);
+    writePinHigh(WALT_ENABLE_PIN);
+
+    // Restore 4800 baud RX+TX for scanning
+    uart1_init_both();
+}
+
+// --------------------------------------------------------------------------
+// matrix_init: brute‑force single‑byte commands, then clear state
+// --------------------------------------------------------------------------
 void matrix_init(void) {
-    serial_init();
+    // Prepare pins + 4800 baud for later scan
+    uart1_init_both();
+    setPinOutput(WALT_ENABLE_PIN);
+    writePinHigh(WALT_ENABLE_PIN);  // start disabled
+
+    // Send every byte 0x00 → 0xFF, one per second at 4800 baud
+    for (uint16_t b = 0x00; b <= 0xFF; b++) {
+        send_one_byte((uint8_t)b);
+        wait_ms(1000);
+    }
+
+    // Clear matrix buffer so matrix_scan() works
     for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
         matrix[r] = 0;
     }
 }
 
+// --------------------------------------------------------------------------
+// matrix_scan: read scan‑codes at 4800 baud
+// --------------------------------------------------------------------------
 uint8_t matrix_scan(void) {
-    static uint8_t drop_left = 2;
+    static uint8_t drop = 2;
     while (UCSR1A & (1 << RXC1)) {
         uint8_t code = UDR1;
         xprintf("Raw byte: 0x%02X\n", code);
-        if (drop_left && code == 0x00) {
-            drop_left--;
-            continue;
-        }
-        drop_left = 0;
-
-        bool pressed = (code & 0x80);
+        if (drop && code == 0x00) { drop--; continue; }
+        drop = 0;
+        bool pressed = code & 0x80;
         uint8_t idx = pressed ? code : ((code & 0x7F) | 0x80);
         uint8_t pos = sc_to_pos_full[idx];
         if (pos == 0xFF) {
-            xprintf("Unmapped code: 0x%02X\n", idx);
+            xprintf("Unmapped: 0x%02X\n", idx);
             continue;
         }
-
         uint8_t row = pos >> 4, col = pos & 0x0F;
-        matrix_row_t m = ((matrix_row_t)1 << col);
+        matrix_row_t mask = ((matrix_row_t)1 << col);
         if (pressed) {
-            matrix[row] |= m;
-            xprintf("Make: row %u, col %u\n", row, col);
+            matrix[row] |= mask;
+            xprintf("Make row %u col %u\n", row, col);
         } else {
-            matrix[row] &= ~m;
-            xprintf("Break: row %u, col %u\n", row, col);
+            matrix[row] &= ~mask;
+            xprintf("Break row %u col %u\n", row, col);
         }
     }
     return 0;
