@@ -69,19 +69,29 @@ layer_state_t layer_state_set_user(layer_state_t state) {
     return state;
 }
 
-// Send full TX byte on every keypress
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed) {
         switch (keycode) {
             case CLICKER:
-                current_sound_mode = SOUND_CLICK;
+                if (current_sound_mode == SOUND_CLICK) {
+                    current_sound_mode = SOUND_NONE;
+                } else {
+                    current_sound_mode = SOUND_CLICK;
+                }
                 return false;
+
             case SUPER_BEEPER:
-                current_sound_mode = SOUND_BEEP;
+                if (current_sound_mode == SOUND_BEEP) {
+                    current_sound_mode = SOUND_NONE;
+                } else {
+                    current_sound_mode = SOUND_BEEP;
+                }
                 return false;
+
             case SILENT:
                 current_sound_mode = SOUND_NONE;
                 return false;
+
             case KC_F:
                 layer_invert(_FN);
                 break;
@@ -95,12 +105,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         if (keycode == KC_F) fn_active = !fn_active;
         if (fn_active) mask |= 0x02;
 
-        // Send TX code
+        // Send TX code based on mode + mask
         uint8_t tx_byte = current_sound_mode | mask;
         xprintf("TX: 0x%02X\n", tx_byte);
         serial_write(tx_byte);
 
         if (keycode == KC_F) return false;
     }
+
     return true;
 }

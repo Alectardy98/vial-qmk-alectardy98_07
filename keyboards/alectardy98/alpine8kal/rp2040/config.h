@@ -16,7 +16,6 @@
 
 #pragma once
 
-#define WS2812_RGBW
 
 
 /* Audio */
