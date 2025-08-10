@@ -15,7 +15,24 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#pragma once
+#undef MATRIX_ROWS
+#undef MATRIX_COLS
+#define MATRIX_ROWS 9      // 8 capsense + 1 extra-direct row
+#define MATRIX_COLS 13     // keep your board’s 13 columns
+
+// — Extra direct row (GPIO keys) —
+#define MATRIX_EXTRA_DIRECT_ROWS 1
+#define MATRIX_EXTRA_DIRECT_COLS 13
+#define MATRIX_EXTRA_DIRECT_PINS_NEED_INTERNAL_PULLUP 1
+#define MATRIX_EXTRA_DIRECT_PINS_ACTIVE_LOW 1
+
+// Put the extra key at row 8, column 12 -> B3 (change B3 if you pick a different pin)
+#undef MATRIX_EXTRA_DIRECT_PINS
+#define MATRIX_EXTRA_DIRECT_PINS { \
+  { NO_PIN, NO_PIN, NO_PIN, NO_PIN, NO_PIN, NO_PIN, NO_PIN, NO_PIN, \
+    NO_PIN, NO_PIN, NO_PIN, NO_PIN, B3 } \
+}
+
 
 #define DEF_SERIAL_NUMBER "purdea.ro:qmk_xwhatsit"
 
@@ -34,29 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // We disable haptic feedbeck during USB low power conditions:
 #define HAPTIC_OFF_IN_LOW_POWER 1
 // You can also tune the following for your solenoid:
-#define SOLENOID_DEFAULT_DWELL 20
+#define SOLENOID_DEFAULT_DWELL 5
 #define SOLENOID_MIN_DWELL 4
 //#define SOLENOID_MAX_DWELL 100
 #define NO_HAPTIC_MOD
 
-// If the lock lights are not used, then please don't define the below pins,
-// or leave them set as unused pins:
 
-// The following definitions are compatible with the Model F SMD controllers
-// from here: https://deskthority.net/viewtopic.php?f=7&t=24597 supporting the
-// AT lock lights header
-#define LED_NUM_LOCK_PIN D7
-#define LED_CAPS_LOCK_PIN E6
-#define LED_SCROLL_LOCK_PIN B6
 
-// The following definitions match the lock lights as used by the original
-// xwhatsit firmware, but enabling all three of these is not compatible with
-// solenoid support
-//#define LED_NUM_LOCK_PIN E6
-//#define LED_CAPS_LOCK_PIN D2
-//#define LED_SCROLL_LOCK_PIN D7
 
-// Uncomment below if the leds are on when the pin is driving zero:
-//#define LED_NUM_LOCK_ACTIVE_LOW
-//#define LED_CAPS_LOCK_ACTIVE_LOW
-//#define LED_SCROLL_LOCK_ACTIVE_LOW
+
+#define DEBUG_MATRIX_SCAN_RATE
