@@ -15,6 +15,7 @@
  */
 #include QMK_KEYBOARD_H
 
+
 // Defines names for use in layer keycodes and the keymap
 enum layer_names {
     _BASE,
@@ -22,8 +23,11 @@ enum layer_names {
     _FN
 };
 
+
+
 enum blender_keycode {
-    VDRT   = QK_KB_0,                  //Desktop Right "set to move right a space on mac"
+    SOLL= QK_KB_0,
+    VDRT,                   //Desktop Right "set to move right a space on mac"
     VDLT,                   //Desktop Left "set to move left a space on mac"
     VDUP,                   //V-Desktop Up "set to mission controll on mac"
     VDDN,                   //Min All "set to show desktop on mac"
@@ -57,102 +61,167 @@ enum blender_keycode {
 };
     
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (record->event.pressed) {             // Code for macros
         switch (keycode) {
+            case SOLL:
+                if (record->event.pressed) {
+                    haptic_toggle();   // or haptic_toggle();
+                } else {
+                    haptic_toggle();   // or haptic_toggle();
+                }
+                return false;
             case VDRT:
-                SEND_STRING(SS_LGUI(SS_DOWN(X_LCTL) SS_TAP(X_RIGHT) SS_UP(X_LCTL)));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(SS_LGUI(SS_DOWN(X_LCTL) SS_TAP(X_RIGHT) SS_UP(X_LCTL)));
+                }
                 break;
             case VDLT:
-                SEND_STRING(SS_LGUI(SS_DOWN(X_LCTL) SS_TAP(X_LEFT) SS_UP(X_LCTL)));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(SS_LGUI(SS_DOWN(X_LCTL) SS_TAP(X_LEFT) SS_UP(X_LCTL)));
+                }
                 break;
             case VDUP:
-                SEND_STRING(SS_LGUI(SS_TAP(X_TAB) SS_TAP(X_T)));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(SS_LGUI(SS_TAP(X_TAB) SS_TAP(X_T)));
+                }
                 break;
             case VDDN:
-                SEND_STRING(SS_LGUI("d"));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(SS_LGUI("d"));
+                }
                 break;
             case EXPL:
-                SEND_STRING(SS_LGUI("e"));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(SS_LGUI("e"));
+                }
                 break;
             case SNIP:
-                SEND_STRING(SS_LGUI(SS_LSFT("s")));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(SS_LGUI(SS_LSFT("s")));
+                }
                 break;
             case COPY:
-                SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_A) SS_TAP(X_C)));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_A) SS_TAP(X_C)));
+                }
                 break;
             case CUTT:
-                SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_A) SS_TAP(X_X)));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_A) SS_TAP(X_X)));
+                }
                 break;
             case PAST:
-                SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_V)));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_V)));
+                }
                 break;
             case TASK:
-                SEND_STRING(SS_LCTL(SS_DOWN(X_RSFT) SS_TAP(X_ESCAPE) SS_UP(X_RSFT)));  // Windows
-                SEND_STRING(SS_LCTL(SS_DOWN(X_LALT) SS_TAP(X_ESCAPE) SS_UP(X_LALT)));    // Mac
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(SS_LCTL(SS_DOWN(X_RSFT) SS_TAP(X_ESCAPE) SS_UP(X_RSFT)));  // Windows
+                    SEND_STRING(SS_LCTL(SS_DOWN(X_LALT) SS_TAP(X_ESCAPE) SS_UP(X_LALT)));    // Mac
+                }
                 break;
             // Discord Section
             case THIS:
-                SEND_STRING(":this:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":this:" SS_TAP(X_ENTER));
+                }
                 break;
             case OOF:
-                SEND_STRING(":oof:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":oof:" SS_TAP(X_ENTER));
+                }
                 break;
             case PIKA:
-                SEND_STRING(":surprised:" SS_TAP(X_ENTER));
-                break;
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":surprised:" SS_TAP(X_ENTER));
+                    break;
+                }
             case SCAT:
-                SEND_STRING(":smiley_cat2:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":smiley_cat2:" SS_TAP(X_ENTER));
+                }
                 break;
             case FCAT:
-                SEND_STRING(":smiley_cat1:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":smiley_cat1:" SS_TAP(X_ENTER));
+                }
                 break;
             case HART:
-                SEND_STRING(":heart:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":heart:" SS_TAP(X_ENTER));
+                }
                 break;
             case DROL:
-                SEND_STRING(":drooling_face:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":drooling_face:" SS_TAP(X_ENTER));
+                }
                 break;
             case MONY:
-                SEND_STRING(":smiley_take:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":smiley_take:" SS_TAP(X_ENTER));
+                }
                 break;
             case FHAT:
-                SEND_STRING(":smiley_fedora:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":smiley_fedora:" SS_TAP(X_ENTER));
+                }
                 break;
             case SPIT:
-                SEND_STRING(":smiley_spit:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":smiley_spit:" SS_TAP(X_ENTER));
+                }
                 break;
             case KING:
-                SEND_STRING(":pepe_king:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":pepe_king:" SS_TAP(X_ENTER));
+                }
                 break;
             case FLEX:
-                SEND_STRING(":muscle:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":muscle:" SS_TAP(X_ENTER));
+                }
                 break;
             case HAHA:
-                SEND_STRING(":smiley_kekw:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":smiley_kekw:" SS_TAP(X_ENTER));
+                }
                 break;
             case LCRY:
-                SEND_STRING(":joy:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":joy:" SS_TAP(X_ENTER));
+                }
                 break;
             case NICE:
-                SEND_STRING(":nice~2:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":nice~2:" SS_TAP(X_ENTER));
+                }
                 break;
             case PPOG:
-                SEND_STRING(":pepe_pog:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":pepe_pog:" SS_TAP(X_ENTER));
+                }
                 break;
             case PRAY:
-                SEND_STRING(":pray_tone2:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":pray_tone2:" SS_TAP(X_ENTER));
+                }
                 break;
             case SWET:
-                SEND_STRING(":sweat_smile:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":sweat_smile:" SS_TAP(X_ENTER));
+                }
                 break;
             case COLD:
-                SEND_STRING(":cold_face:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":cold_face:" SS_TAP(X_ENTER));
+                }
                 break;
             case THUM:
-                SEND_STRING(":thumbsup:" SS_TAP(X_ENTER));
+                if (record->event.pressed) {             // Code for macros
+                    SEND_STRING(":thumbsup:" SS_TAP(X_ENTER));
+                }
                 break;
         }
-    }
 
 #ifdef CONSOLE_ENABLE // Console Debug
     uprintf("KL: kc: 0x%04X, col: %u, row: %u, pressed: %1u, time: %u, interrupt: %1u, count: %u\n",
@@ -166,7 +235,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [_BASE] = LAYOUT(
-                                   HF_TOGG,
+                                      SOLL,
      KC_ESC,    TASK,      KC_GRV,    KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0, KC_MINS,  KC_EQL, KC_BSPC,     KC_MUTE, KC_MPLY,    KC_INS, KC_HOME, KC_PGUP,
        SNIP,    EXPL,      KC_TAB,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P, KC_LBRC, KC_RBRC, KC_BSLS,     DM_PLY1, DM_PLY2,    KC_DEL,  KC_END, KC_PGDN,
        COPY,    PAST,     KC_CAPS,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L, KC_SCLN, KC_QUOT,  KC_ENT,  KC_ENT,     KC_VOLD, KC_VOLU,   _______,   KC_UP, _______,

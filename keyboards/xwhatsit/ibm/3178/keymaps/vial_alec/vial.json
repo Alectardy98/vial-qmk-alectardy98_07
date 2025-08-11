@@ -3,6 +3,10 @@
   "vendorId": "0x7281",
   "productId": "0x0112",
   "customKeycodes": [
+      {"name": "SOLL",
+       "title": "Blue Button Solonoide",
+       "shortName": "SOLL"
+      },
       {"name": "VDRT",
        "title": "Virtual Desktop Right",
        "shortName": "VDRT"
@@ -82,46 +86,6 @@
       {"name": "SPIT",
        "title": ":smiley_spit: emoji on discord",
        "shortName": "SPIT"
-      },
-      {"name": "KING",
-       "title": ":pepe_king: emoji on discord",
-       "shortName": "KING"
-      },
-      {"name": "FLEX",
-       "title": ":muscle: emoji on discord",
-       "shortName": "FLEX"
-      },
-      {"name": "HAHA",
-       "title": ":smiley_kekw: emoji on discord",
-       "shortName": "HAHA"
-      },
-      {"name": "LCRY",
-       "title": ":joy: emoji on discord",
-       "shortName": "LCRY"
-      },
-      {"name": "NICE",
-       "title": ":nice~2: emoji on discord",
-       "shortName": "NICE"
-      },
-      {"name": "PPOG",
-       "title": ":pepe_pog: emoji on discord",
-       "shortName": "PPOG"
-      },
-      {"name": "PRAY",
-       "title": ":pray_tone2: emoji on discord",
-       "shortName": "PRAY"
-      },
-      {"name": "SWET",
-       "title": ":sweat_smile: emoji on discord",
-       "shortName": "SWET"
-      },
-      {"name": "COLD",
-       "title": ":cold_face: emoji on discord",
-       "shortName": "COLD"
-      },
-      {"name": "THUM",
-       "title": ":thumbsup: emoji on discord",
-       "shortName": "THUM"
       }
   ],
   "lighting": "none",
