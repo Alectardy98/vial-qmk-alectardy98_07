@@ -19,5 +19,6 @@ MCUFLAGS += -march=armv7e-m \
 
 OPT_DEFS += -Ofast -ffast-math -funroll-loops \
             -fno-tree-vectorize -fno-signed-zeros -fno-math-errno \
-            -fno-common -fomit-frame-pointer -falign-functions=16 \
-            -falign-loops=16 -falign-jumps=16 -fno-exceptions -fno-unwind-tables
+            -fomit-frame-pointer -falign-functions=16 \
+            -falign-loops=16 -falign-jumps=16 -fno-exceptions -fno-unwind-tables \
+            -fcommon

@@ -15,7 +15,8 @@
  */
 
 #include "ec_switch_matrix.h"
-#include "socd_cleaner.h"
+//#include "socd_cleaner.h"
+#include "modules/getreuer/socd_cleaner/socd_cleaner.h"
 #include "action.h"
 #include "print.h"
 #include "via.h"
@@ -92,7 +93,8 @@ void via_config_set_value(uint8_t *data) {
                 uprintf("# Actuation Mode: Rapid Trigger #\n");
                 uprintf("#################################\n");
             }
-            eeconfig_update_kb_datablock_field(eeprom_ec_config, actuation_mode);
+            // Update EEPROM with new actuation mode (new API)
+            eeconfig_update_kb_datablock(&eeprom_ec_config);
             break;
         }
         case id_mode_0_actuation_threshold: {
@@ -425,7 +427,8 @@ void ec_save_threshold_data(uint8_t option) {
         ec_rescale_values(3);
         ec_rescale_values(4);
     }
-    eeconfig_update_kb_datablock(&eeprom_ec_config, 0, EECONFIG_KB_DATA_SIZE);
+    // New single-arg EEPROM update
+    eeconfig_update_kb_datablock(&eeprom_ec_config);
     uprintf("####################################\n");
     uprintf("# New thresholds applied and saved #\n");
     uprintf("####################################\n");
@@ -453,7 +456,8 @@ void ec_save_bottoming_reading(void) {
     ec_rescale_values(2);
     ec_rescale_values(3);
     ec_rescale_values(4);
-    eeconfig_update_kb_datablock(&eeprom_ec_config, 0, EECONFIG_KB_DATA_SIZE);
+    // New single-arg EEPROM update
+    eeconfig_update_kb_datablock(&eeprom_ec_config);
 }
 
 // Show the calibration data
@@ -530,25 +534,25 @@ void ec_clear_bottoming_calibration_data(void) {
 uint16_t socd_pair_handler(bool mode, uint8_t pair_idx, uint8_t field, uint16_t value) {
     if (mode) { // set
         switch (field) {
-            case 0: // enabled
+            case 0: // enabled / resolution
                 eeprom_ec_config.socd_opposing_pairs[pair_idx].resolution = value;
                 socd_opposing_pairs[pair_idx].resolution                  = value;
-                eeconfig_update_kb_datablock_field(eeprom_ec_config, socd_opposing_pairs);
+                eeconfig_update_kb_datablock(&eeprom_ec_config);
                 return 0;
             case 1: // key 1
                 eeprom_ec_config.socd_opposing_pairs[pair_idx].keys[0] = value;
                 socd_opposing_pairs[pair_idx].keys[0]                  = value;
-                eeconfig_update_kb_datablock_field(eeprom_ec_config, socd_opposing_pairs);
+                eeconfig_update_kb_datablock(&eeprom_ec_config);
                 return 0;
             case 2: // key 2
                 eeprom_ec_config.socd_opposing_pairs[pair_idx].keys[1] = value;
                 socd_opposing_pairs[pair_idx].keys[1]                  = value;
-                eeconfig_update_kb_datablock_field(eeprom_ec_config, socd_opposing_pairs);
+                eeconfig_update_kb_datablock(&eeprom_ec_config);
                 return 0;
             case 3: // mode/resolution
                 eeprom_ec_config.socd_opposing_pairs[pair_idx].resolution = value;
                 socd_opposing_pairs[pair_idx].resolution                  = value;
-                eeconfig_update_kb_datablock_field(eeprom_ec_config, socd_opposing_pairs);
+                eeconfig_update_kb_datablock(&eeprom_ec_config);
                 return 0;
             default:
                 return 0;
