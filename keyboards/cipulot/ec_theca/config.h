@@ -1,4 +1,4 @@
-/* Copyright 2023 Cipulot
+/* Copyright 2025 Cipulot
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,8 @@
 
 #define MATRIX_ROWS 6
 #define MATRIX_COLS 16
+
+#define UNUSED_POSITIONS_LIST { {3, 12}, {4, 11}, {4, 12}, {5, 3}, {5, 4}, {5, 6}, {5, 7}, {5, 8}, {5, 9} }
 
 #define MATRIX_ROW_PINS \
     { B4, A14, B3, A15, B6, B5 }
@@ -59,7 +61,5 @@
 #define DEFAULT_CALIBRATION_STARTER true
 
 #define DISCHARGE_TIME 10
-
-// #define DEBUG_MATRIX_SCAN_RATE
 #define DYNAMIC_KEYMAP_LAYER_COUNT 3
-#define EECONFIG_KB_DATA_SIZE 201
+#define EECONFIG_KB_DATA_SIZE 221

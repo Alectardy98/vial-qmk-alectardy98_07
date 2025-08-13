@@ -1,4 +1,4 @@
-/* Copyright 2023 Cipulot
+/* Copyright 2025 Cipulot
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,8 @@
 
 #define MATRIX_ROWS 6
 #define MATRIX_COLS 16
+
+#define UNUSED_POSITIONS_LIST { {5, 3}, {5, 5} }
 
 #define MATRIX_ROW_PINS \
     { B6, B5, B12, B10, B13, B7 }
@@ -57,9 +59,7 @@
 #define DEFAULT_CALIBRATION_STARTER true
 
 #define DISCHARGE_TIME 10
-
-// #define DEBUG_MATRIX_SCAN_RATE
-#define EECONFIG_KB_DATA_SIZE 201
+#define EECONFIG_KB_DATA_SIZE 221
 
 // PWM driver with direct memory access (DMA) support
 #define WS2812_PWM_DRIVER PWMD3

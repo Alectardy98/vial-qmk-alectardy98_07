@@ -1,4 +1,4 @@
-/* Copyright 2023 Cipulot
+/* Copyright 2025 Cipulot
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,8 @@
 
 #define MATRIX_ROWS 5
 #define MATRIX_COLS 15
+
+#define UNUSED_POSITIONS_LIST { {2, 14}, {3, 12}, {4, 0}, {4, 3}, {4, 4}, {4, 5}, {4, 7}, {4, 8}, {4, 9}, {4, 12}, {4, 13}, {4, 14} }
 
 #define MATRIX_ROW_PINS \
     { B7, B6, A9, A10, B3 }
@@ -58,4 +60,4 @@
 
 #define DISCHARGE_TIME 10
 
-#define EECONFIG_KB_DATA_SIZE 159
+#define EECONFIG_KB_DATA_SIZE 179
