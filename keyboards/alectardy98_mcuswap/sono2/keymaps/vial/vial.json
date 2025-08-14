@@ -2,6 +2,16 @@
   "name": "Sono2 MCU Swap",
   "vendorId": "0x7281",
   "productId": "0x0003",
+  "customKeycodes": [
+      {"name": "TEST",
+       "title": "TEST",
+       "shortName": "TEST"
+      },
+      {"name": "TZRO",
+       "title": "000",
+       "shortName": "TZRO"
+      }
+  ],
   "lighting": "none",
   "matrix": {
       "rows": 3,

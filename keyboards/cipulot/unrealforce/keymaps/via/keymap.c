@@ -17,15 +17,7 @@
 #include QMK_KEYBOARD_H
 
 #include "keymap_japanese.h"
-#include "print.h"
 
-void keyboard_post_init_user(void) {
-#if defined(VIA_CUSTOM_MENU_ENABLE)
-    uprintf("VIA protocol version: 3 (custom menu enabled)\n");
-#else
-    uprintf("VIA protocol version: 2 (custom menu disabled)\n");
-#endif
-}
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
     [0] = LAYOUT_all(

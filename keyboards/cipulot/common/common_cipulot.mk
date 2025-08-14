@@ -21,4 +21,5 @@ OPT_DEFS += -Ofast -ffast-math -funroll-loops \
             -fno-tree-vectorize -fno-signed-zeros -fno-math-errno \
             -fomit-frame-pointer -falign-functions=16 \
             -falign-loops=16 -falign-jumps=16 -fno-exceptions -fno-unwind-tables \
-            -fcommon
+            -fcommon -DVIA_CUSTOM_MENU_ENABLE
+

@@ -27,25 +27,24 @@ bool led_update_kb(led_t led_state) {
     if (!led_update_user(led_state)) {
         return false; // Respect user override
     }
-        if (layer_state_is(_NUM)) {              // Force Num Lock LED On when in NUM layer
+        if (layer_state_is(_NUM)) {             // Num Lock Indacator
         writePin(D1, true);
     } else {
-        writePin(D1, false);
+        writePin(D1, false);                    // Num Lock Indacator
     }
-        if (layer_state_is(_FN)) {              // Force Num Lock LED On when in NUM layer
-        writePin(D0, true);
-        writePin(D1, true);
-        writePin(D2, true);
-        writePin(D3, true);
-        writePin(D5, true);
+        if (layer_state_is(_FN)) {
+        writePin(D0, true);                     // KB Lock Indacator
+        writePin(D5, true);                     // JP Lock Indacator
     } else {
-        writePin(D0, false);
-        writePin(D1, false);
-        writePin(D2, false);
-        writePin(D3, false);
-        writePin(D5, false);
+        writePin(D0, false);                    // KB Lock Indacator
+        writePin(D5, false);                    // JP Lock Indacator
     }
-    writePin(D3, led_state.caps_lock);
+        if (layer_state_is(_MOUSE)) {
+        writePin(D2, true);                     // Ctrl Lock Indacator
+    } else {
+        writePin(D2, false);                    // Ctrl Lock Indacator
+    }
+    writePin(D3, led_state.caps_lock);          // Caps Lock Indacator
     return true;
 }
 
@@ -213,20 +212,20 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [_BASE] = LAYOUT(
-           TASK,    QUIT,            KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,            KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,                SNIP,    EXPL, \
-         KC_ESC,    KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0, KC_MINS,  KC_EQL, KC_BSLS, KC_BSPC,       COPY,    PAST, \
-         KC_TAB,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P, KC_LBRC, KC_RBRC, KC_ENT,                 VDLT,    VDRT, \
-        KC_LCTL,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L, KC_SCLN, KC_QUOT, KC_NUHS,                        KC_UP,          \
-        KC_LSFT,    KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH, KC_NUBS, KC_RSFT,                      KC_LEFT, KC_RGHT, \
-        KC_LALT, KC_LGUI, MO(_FN), KC_LCTL,        LT(_MOUSE, KC_SPC),  KC_SPC,          KC_BSPC,          KC_RALT, KC_CAPS,                      KC_DOWN,          \
-                                                              KC_LSFT, KC_RSFT                                                                                      \
+         KC_ESC,    TASK,            KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,            KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,                SNIP,    EXPL, \
+         KC_GRV,    KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0, KC_MINS,  KC_EQL, KC_BSPC, KC_BSPC,       COPY,    PAST, \
+         KC_TAB,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P, KC_LBRC, KC_RBRC,  KC_ENT,              KC_INS,  KC_DEL, \
+        KC_CAPS,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L, KC_SCLN, KC_QUOT,  KC_ENT,                        KC_UP,          \
+        KC_LSFT,    KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH, KC_BSLS, KC_RSFT,                      KC_LEFT, KC_RGHT, \
+        KC_LCTL, KC_LGUI, MO(_FN), KC_LALT,        LT(_MOUSE, KC_SPC),  KC_SPC,          KC_BSPC,          KC_RCTL, KC_RALT,                      KC_DOWN,          \
+                                                              MO(_FN), MO(_NUM)                                                                                      \
         ),
     [_NUM] = LAYOUT(
         _______, _______,          _______, _______, _______, _______, _______,          _______, _______, _______, _______, _______,             _______, _______, \
-        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,    _______, _______, \
-        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,             _______, _______, \
-        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                      _______,          \
-        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                      _______, _______, \
+        _______, _______, _______, _______, _______, _______, _______, KC_PAST, KC_PSLS, KC_PMNS, KC_PPLS, _______, _______, _______, _______,    _______, _______, \
+        _______, _______, _______, _______, _______, _______, _______,    KC_7,    KC_8,    KC_9, KC_PEQL, _______, _______, _______,             _______, _______, \
+        _______, _______, _______, _______, _______, _______, _______,    KC_4,    KC_5,    KC_6, KC_PDOT, _______, _______,                      _______,          \
+        _______, _______, _______, _______, _______, _______,    KC_0,    KC_1,    KC_2,    KC_3, KC_COMM, _______, _______,                      _______, _______, \
         _______, _______, _______, _______,          _______,          _______,          _______,          _______, _______,                      _______,          \
                                                               _______, _______                                                                                      \
         ),
@@ -241,10 +240,10 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         ),
     [_FN] = LAYOUT(
         QK_BOOT, _______,          _______, _______, _______, _______, _______,          _______, _______, _______, _______, _______,             _______, _______, \
-        QK_BOOT,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,  KC_F12, _______,  KC_DEL,    _______, _______, \
-           SNIP,    THIS,     OOF,    PIKA,    SCAT,    FCAT,    HART,    DROL,    MONY,    FHAT   , SPIT, _______, _______, _______,             _______, _______, \
-        KC_CAPS,  C(KC_A), C(KC_S), C(KC_D), C(KC_F), _______, _______, _______, _______, _______, KC_VOLD, KC_VOLU, _______,                        VDUP,          \
-        _______,  C(KC_Z), C(KC_X), C(KC_C), C(KC_V), _______, _______, _______, KC_MPRV, KC_MNXT, KC_MPLY, _______, _______,                         VDLT,    VDRT, \
+        QK_BOOT,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_DEL,  KC_DEL,    _______, _______, \
+           SNIP,    THIS,     OOF,    PIKA,    SCAT,    FCAT,    HART,    DROL,    MONY,    FHAT,    SPIT, _______, _______, _______,             _______, _______, \
+        KC_CAPS, C(KC_A), C(KC_S), C(KC_D), C(KC_F), _______, _______, _______, _______, _______, KC_VOLD, KC_VOLU, _______,                         VDUP,          \
+        _______, C(KC_Z), C(KC_X), C(KC_C), C(KC_V), _______, _______, _______, KC_MPRV, KC_MNXT, KC_MPLY, _______, _______,                         VDLT,    VDRT, \
         _______, _______, _______, KC_LGUI,          _______,          _______,          _______,          _______, _______,                         VDDN,          \
                                                               _______, _______                                                                                      \
         ),

@@ -18,34 +18,51 @@
 
 enum layer_names {  //Define Layers
     _BASE,
-    _FN
+    _NUM
 };
 
+enum blender_keycode {
+    TEST = QK_KB_0,
+    TZRO,                   //Desktop Right "set to move right a space on mac"
+};
+    
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-  // If console is enabled, it will print the matrix position and status of each key pressed
-#ifdef CONSOLE_ENABLE //Console Debug
-    uprintf("KL: kc: 0x%04X, col: %u, row: %u, pressed: %1u, time: %u, interrupt: %1u, count: %u\n", keycode, record->event.key.col, record->event.key.row, record->event.pressed, record->event.time, record->tap.interrupted, record->tap.count);
+    if (record->event.pressed) {             // Code for macros
+        switch (keycode) {
+            case TEST:
+                SEND_STRING("TEST");
+                break;
+            case TZRO:
+                SEND_STRING("000");
+                break;
+        }
+    }
+
+#ifdef CONSOLE_ENABLE // Console Debug
+    uprintf("KL: kc: 0x%04X, col: %u, row: %u, pressed: %1u, time: %u, interrupt: %1u, count: %u\n",
+            keycode, record->event.key.col, record->event.key.row, record->event.pressed, record->event.time,
+            record->tap.interrupted, record->tap.count);
 #endif
+
     return true;
 }
-        
         
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [_BASE] = LAYOUT(
-                     _______,
-                     _______, _______, _______, _______,
-                     _______, _______, _______, _______,
-                     _______, _______, _______, _______,
-                     _______, _______, _______, _______,
-                     _______, _______, _______,
+                    MO(_NUM),
+                     KC_PAST, KC_PSLS, KC_PMNS, KC_PPLS,
+                        KC_7,    KC_8,    KC_9, KC_PEQL,
+                        KC_4,    KC_5,    KC_6, KC_PDOT,
+                        KC_1,    KC_2,    KC_3, KC_COMM,
+                        KC_0,    TZRO,  KC_ENT
         ),
-    [_FN] = LAYOUT(
+    [_NUM] = LAYOUT(
                    _______,
-                   _______, _______, _______, _______,
-                   _______, _______, _______, _______,
-                   _______, _______, _______, _______,
-                   _______, _______, _______, _______,
-                   _______, _______, _______, _______
+                    KC_ESC, _______,  KC_INS,  KC_DEL,
+                   _______,   KC_UP, _______, _______,
+                   KC_LEFT, _______, KC_RGHT, _______,
+                   _______, KC_DOWN, _______, _______,
+                   _______, _______, _______
         )
 };
