@@ -16,8 +16,6 @@
 
 #pragma once
 
-
-
 /* Audio */
 #define AUDIO_PIN GP0
 #define AUDIO_PWM_DRIVER PWMD0

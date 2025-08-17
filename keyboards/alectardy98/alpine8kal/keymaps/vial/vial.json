@@ -14,9 +14,21 @@
             "H87",
             "H88"
         ],
-        "Double Action Esc",
-        "Double Action Grv",
-        "Split Backspace",
+        [
+            "Esc",
+            "Normal",
+            "Double Action"
+        ],
+        [
+            "Grv",
+            "Normal",
+            "Double Action"
+        ],
+        [
+            "Backspace",
+            "2u",
+            "Split 1u"
+        ],
         [
             "Enter",
             "Ansi",
@@ -25,8 +37,11 @@
             "BAE",
             "Zenith"
         ],
-        "Split Left Shift",
         [
+            "Left Shift",
+            "Full",
+            "Split"
+        ],        [
             "Right Shift",
             "Full",
             "Left Split",
