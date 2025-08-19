@@ -1,28 +1,27 @@
-/*
-Copyright 2018 listofoptions <listofoptions@gmail.com>
+/* Copyright 2022 Alectardy98
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 2 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-#include "quantum.h"
 #include QMK_KEYBOARD_H
 
-enum layer_names {
-    _BASE,
-    _FN
-};
+enum _layer {
+  _BASE,
+  _FN
+  };
 
+// Defines the keycodes used by our macros in process_record_user
 enum blender_keycode {
     TEST = QK_KB_0,
     VDRT,                   //Desktop Right "set to move right a space on mac"
@@ -203,41 +202,21 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-    /* ,---------.  ,---------------------------------------------------------.  ,---------.    ,-------------------.
-     * | esc|TSKM|  |   f1|   f2|   f3|   f4|xxxx|xxxx|   f5|   f6|   f7|   f8|  |xxxx|xxxx|    |  f9| f10| f11| f12|
-     * `---------'  `---------------------------------------------------------'  `---------'    `-------------------'
-     * ,------------------------------------------------------------------------..---------.    ,-------------------.
-     * |     `|   1|   2|   3|   4|   5|   6|   7|   8|   9|   0|   -|   =| back||ins |home|    |   *|   /|   +|   -|
-     * |------------------------------------------------------------------------||---------|    |-------------------|
-     * |     tab|   q|   w|   e|   r|   t|   y|   u|   i|   o|   p|   [|  ]|   \||del | end|    |   7|   8|   9|pade|
-     * |------------------------------------------------------------------------||---------|    |-------------------|
-     * |caps|ctrl|   a|   s|   d|   f|   g|   h|   j|   k|   l|   ;|   '|   retr||xxxx|pgup|    |   4|   5|   6|   ,|
-     * |------------------------------------------------------------------------------------    |-------------------|
-     * |del |lsft  |   z|   x|   c|   v|   b|   n|   m|   ,|   .|   /|rsft  | app|  up|pgdn|    |   1|   2|   3| tab|
-     * |-------------------------------------------------------------------------|---------|    |---------------    |
-     * | gui|XLEFT |lalt|              space                    |ralt|XRGHT |left|down|rght|    |        0|   .|    |
-     * `-----------------------------------------------------------------------------------'    `-------------------'
-     */
-     
     [_BASE] = LAYOUT(
-        KC_ESC,     TASK,   KC_F1,    KC_F2,  KC_F3,   KC_F4, KC_HOME, KC_PSCR,   KC_F5,   KC_F6,   KC_F7,   KC_F8,                    KC_INS,  KC_DEL,      KC_F9,  KC_F10,  KC_F11,  KC_F12, \
-        KC_GRAVE,   KC_1,    KC_2,     KC_3,   KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0,KC_MINUS,KC_EQUAL, KC_BSPC, DM_PLY1, DM_PLY2,    KC_PAST, KC_PSLS, KC_PPLS, KC_PMNS, \
-        KC_TAB,     KC_Q,    KC_W,     KC_E,   KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P, KC_LBRC, KC_RBRC, KC_BSLS,    SNIP,    EXPL,       KC_7,    KC_8,    KC_9, KC_COMM, \
-       KC_CAPS,  KC_LCTL,    KC_A,     KC_S,   KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L, KC_SCLN, KC_QUOT,  KC_ENT,    COPY,    PAST,       KC_4,    KC_5,    KC_6, KC_PENT, \
-        KC_DEL,  KC_LSFT,    KC_Z,     KC_X,   KC_C,    KC_V,    KC_B,    KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH, KC_RSFT, KC_MPRV,   KC_UP, KC_MNXT,       KC_1,    KC_2,    KC_3,  KC_TAB, \
-        KC_LCTL, MO(_FN), KC_LALT,                                    KC_SPACE,                            KC_RALT, KC_LGUI, KC_LEFT, KC_DOWN, KC_RGHT,                KC_0,  KC_DOT           \
-    ),
+                      KC_ESC,    TASK,            KC_F1,   KC_F2,   KC_F3,   KC_F4, KC_HOME,  KC_END,   KC_F5,   KC_F6,   KC_F7,   KC_F8,          DM_PLY1, DM_PLY2,            KC_F9,  KC_F10,  KC_F11,  KC_F12,
+                      KC_GRV,    KC_1,    KC_2,     KC_3,   KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0, KC_MINS,  KC_EQL, KC_BSPC,  KC_DEL,  KC_INS,          KC_PAST, KC_PSLS, KC_PPLS, KC_PMNS,
+                      KC_TAB,    KC_Q,    KC_W,     KC_E,   KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P, KC_LBRC, KC_RBRC, KC_BSLS,    SNIP,    EXPL,             KC_7,    KC_8,    KC_9, KC_PENT,
+                     KC_CAPS, KC_LCTL,    KC_A,     KC_S,   KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L, KC_SCLN, KC_QUOT,  KC_ENT,    COPY,    PAST,             KC_4,    KC_5,    KC_6, KC_PCMM,
+                      KC_DEL, KC_LSFT,    KC_Z,     KC_X,   KC_C,    KC_V,    KC_B,    KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH, KC_RSFT, KC_MPRV,   KC_UP, KC_MNXT,             KC_1,    KC_2,    KC_3,  KC_TAB,
+                     MO(_FN),          KC_LALT,                                      KC_SPC,                   KC_RALT,                   KC_LEFT, KC_DOWN, KC_RGHT,             KC_0,          KC_DOT),
+    
+    
     [_FN] = LAYOUT(
-        QK_BOOT, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                   _______, _______,    _______, _______, _______, _______, \
-        _______,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,  KC_F12, KC_DEL,  DM_REC1, DM_REC2,    _______, _______, _______, _______, \
-           SNIP,    THIS,     OOF,    PIKA,    SCAT,    FCAT,    HART,    DROL,    MONY,    FHAT,    SPIT, _______, _______, _______, _______, _______,    _______,    0 bnv89  564v5c6fttvcb   gf, _______, _______, \
-        _______, KC_LCTL, C(KC_A), C(KC_S), C(KC_D), C(KC_F), _______, _______, _______, _______, _______, KC_VOLD, KC_VOLU, _______, _______, _______,       VDLT,    QUIT,    VDRT, _______, \
-        _______, _______, C(KC_Z), C(KC_X), C(KC_C), C(KC_V), _______, _______, _______, KC_MPRV, KC_MNXT, KC_MPLY, _______, KC_VOLD,    VDUP, KC_VOLU,    _______,    VDDN, _______, _______, \
-        KC_LGUI, _______, _______,                                     _______,                            _______, _______,    VDLT,    VDDN,    VDRT,             _______, _______           \
-    ),
-
+                   QK_BOOT, _______,          _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,          DM_REC1, DM_REC2,          _______, _______, _______, _______,
+                   _______,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_DEL, _______, _______,          _______, _______, _______, _______,
+                      SNIP,    THIS,     OOF,    PIKA,    SCAT,    FCAT,    HART,    DROL,    MONY,    FHAT,    SPIT, _______, _______, _______, _______, _______,          _______,    VDUP, _______, _______,
+                   _______, KC_LCTL, C(KC_A), C(KC_S), C(KC_D), C(KC_F), _______, _______, _______, _______, _______, KC_VOLD, KC_VOLU, _______, _______, _______,             VDLT,    QUIT,    VDRT, _______,
+                   _______, _______, C(KC_Z), C(KC_X), C(KC_C), C(KC_V), _______, _______, _______, KC_MPRV, KC_MNXT, KC_MPLY, _______, KC_VOLD,    VDUP, KC_VOLU,          _______,    VDDN, _______, _______,
+                   _______,          KC_LGUI,                                     _______,                   _______,                      VDLT,    VDDN,    VDRT,          _______,          _______),
 };
-    
-    
-    
 
