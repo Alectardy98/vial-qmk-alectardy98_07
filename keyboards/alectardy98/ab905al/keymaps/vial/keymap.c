@@ -21,6 +21,42 @@ enum _layer {
   _FN
   };
 
+bool led_update_kb(led_t led_state) {
+    if (!led_update_user(led_state)) {
+        return false; // Respect user override
+    }
+
+    // Num Lock LED (host state)
+    if (led_state.num_lock) {
+        writePin(GP25, true);
+    } else {
+        writePin(GP25, false);
+    }
+
+    // Scroll Lock LED (host state)
+    if (led_state.scroll_lock) {
+        writePin(GP27, true);
+    } else {
+        writePin(GP27, false);
+    }
+
+    // Caps Lock LED (host state)
+    if (led_state.caps_lock) {
+        writePin(GP26, true);
+    } else {
+        writePin(GP26, false);
+    }
+
+    // FN Layer LED (layer state)
+    if (layer_state_is(_FN)) {
+        writePin(GP28, true);
+    } else {
+        writePin(GP28, false);
+    }
+
+    return true;
+}
+
 
     
 
