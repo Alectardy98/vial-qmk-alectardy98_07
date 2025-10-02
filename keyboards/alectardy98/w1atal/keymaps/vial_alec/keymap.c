@@ -1,8 +1,8 @@
-/* Copyright 2025 Cipulot
+/* Copyright 2022 Alectardy98
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * the Free Software Foundation, either version 2 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -16,39 +16,11 @@
 
 #include QMK_KEYBOARD_H
 
-void ec_apply_calibration_defaults(void);
-
-void keyboard_post_init_user(void) {
-    ec_apply_calibration_defaults();
-}
 enum _layer {
   _BASE,
-  _HHKB,
   _FN,
-  _FN2
+  _NUM
 };
-
-#ifdef RGB_MATRIX_ENABLE
-#    include "rgb_matrix.h"
-
-bool rgb_matrix_indicators_user(void) {
-    uint8_t layer = get_highest_layer(layer_state | default_layer_state);
-
-    uint8_t r = 0, g = 0, b = 0;  // default = OFF (base layer)
-
-    switch (layer) {
-        case _HHKB: r = 255; break;  // red
-        case _FN:   g = 255; break;  // green
-        case _FN2:  b = 255; break;  // blue
-        default: /* _BASE */ break;  // keep off
-    }
-
-    // You have 1 LED mapped at index 0; set it each frame.
-    rgb_matrix_set_color(0, r, g, b);
-    return false;
-}
-#endif
-
 
 // Defines the keycodes used by our macros in process_record_user
 enum blender_keycode {
@@ -231,33 +203,33 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-    [_BASE] = LAYOUT_all(
-         KC_ESC,     KC_1,     KC_2,     KC_3,     KC_4,     KC_5,    KC_6,       KC_7,     KC_8,    KC_9,      KC_0, KC_MINS,    KC_EQL,  KC_BSLS,  KC_GRV,
-         KC_TAB,     KC_Q,     KC_W,     KC_E,     KC_R,     KC_T,    KC_Y,       KC_U,     KC_I,    KC_O,      KC_P, KC_LBRC,   KC_RBRC,  KC_BSPC,
-        KC_LCTL,     KC_A,     KC_S,     KC_D,     KC_F,     KC_G,    KC_H,       KC_J,     KC_K,    KC_L,   KC_SCLN, KC_QUOT,   _______, KC_ENTER,
-        KC_LSFT,  _______,     KC_Z,     KC_X,     KC_C,     KC_V,    KC_B,       KC_N,     KC_M, KC_COMM,    KC_DOT, KC_SLSH,   KC_RSFT,    MO(_HHKB),
-                    MO(_FN),  KC_LALT,                                KC_SPC,                                  KC_RGUI, KC_RCTL),
 
-    [_HHKB] = LAYOUT_all(
-        _______,    KC_F1,    KC_F2,    KC_F3,    KC_F4,    KC_F5,    KC_F6,     KC_F7,   KC_F8,    KC_F9,   KC_F10,  KC_F11,    KC_F12,   KC_INS,   KC_DEL,
-        KC_CAPS,  _______,  _______,  _______,  _______,  _______,  _______,   _______, KC_PSCR,  KC_SCRL, KC_PAUSE,   KC_UP,   _______,   KC_DEL,
-        _______,  KC_VOLD,  KC_VOLU,  KC_MUTE,  _______,  _______,  S(KC_8),   KC_SLSH, KC_HOME,  KC_PGUP,  KC_LEFT, KC_RGHT,   _______,  _______,
-        _______,  _______,  _______,  _______,  _______,  _______,  _______, S(KC_EQL), KC_MINS,   KC_END,  KC_PGDN, KC_DOWN,   _______,  _______,
-                  _______,  _______,                                _______,                                _______, _______),
-
-    [_FN] = LAYOUT_all(
-
-        QK_BOOT,    KC_F1,    KC_F2,    KC_F3,    KC_F4,    KC_F5,    KC_F6,    KC_F7,    KC_F8,    KC_F9,   KC_F10,  KC_F11,    KC_F12,   KC_INS,   KC_DEL,
-           SNIP,     THIS,      OOF,     PIKA,     SCAT,     FCAT,     HART,     DROL,     MONY,     FHAT,     SPIT,  _______,  _______,  _______,
-        KC_LCTL,  C(KC_A),  C(KC_S),  C(KC_D),  C(KC_F),  _______,  _______,  _______,  _______,  _______,  KC_VOLD,  KC_VOLU,  _______,  _______,
-        _______,  _______,  C(KC_Z),  C(KC_X),  C(KC_C),  C(KC_V),  _______,  _______,  _______,  KC_MPRV,  KC_MNXT,  KC_MPLY,  _______,  _______,
-                  _______, MO(_FN2),                                _______,                                _______,  _______),
-    
-    [_FN2] = LAYOUT_all(
-
-        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,
-        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,     VDUP,  _______,  _______,
-        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,     VDLT,     VDRT,  _______,  _______,
-        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,     VDDN,  _______,  _______,
-                  _______,  _______,                                _______,                                _______,  _______)
+[_BASE] = LAYOUT(
+     KC_ESC,    TASK,       KC_GRV,    KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0, KC_MINS,  KC_EQL, KC_BSPC,     TG(_NUM), KC_PSLS, KC_PAST, KC_PMNS,
+    DM_PLY1, DM_PLY2,       KC_TAB,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P, KC_LBRC, KC_RBRC, KC_BSLS,         KC_7,    KC_8,    KC_9, KC_PPLS,
+       SNIP,    EXPL,      KC_CAPS,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L, KC_SCLN, KC_QUOT,  KC_ENT,                  KC_4,    KC_5,    KC_6, _______,
+       COPY,    PAST,      KC_LSFT,    KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH, KC_RSFT, _______,                  KC_1,    KC_2,    KC_3, KC_PENT,
+       VDLT,    VDRT,      MO(_FN), _______, KC_LALT,                             KC_SPC,                            KC_RALT, _______, KC_RCTL,                  KC_0, _______,  KC_DOT, _______),
+[_FN] = LAYOUT(
+    QK_BOOT, _______,      _______,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_DEL,      _______, _______, _______, _______,
+    DM_REC1, DM_REC2,         SNIP,    THIS,     OOF,    PIKA,    SCAT,    FCAT,    HART,    DROL,    MONY,    FHAT,    SPIT, _______, _______, _______,      _______,    VDUP, _______, _______,
+    CK_DOWN,   CK_UP,      KC_LCTL, C(KC_A), C(KC_S), C(KC_D), C(KC_F), _______, _______, _______, _______, _______, KC_VOLD, KC_VOLU, _______,                  VDLT,    QUIT,    VDRT, _______,
+    CK_TOGG,  CK_RST,      _______, C(KC_Z), C(KC_X), C(KC_C), C(KC_V), _______, _______, _______, KC_MPRV, KC_MNXT, KC_MPLY, _______, _______,               _______,    VDDN, _______, _______,
+    MU_TOGG, MU_NEXT,      _______, _______, KC_LGUI,                            CK_TOGG,                            _______, _______, _______,               _______, _______, _______, _______),
+[_NUM] = LAYOUT(
+    _______, _______,      _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,      _______, _______, _______, _______,
+    _______, _______,      _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,      KC_HOME,   KC_UP, KC_PGUP, _______,
+    _______, _______,      _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,               KC_LEFT, _______, KC_RGHT, _______,
+    _______, _______,      _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                KC_END, KC_DOWN, KC_PGDN, _______,
+    _______, _______,      _______, _______, _______,                            _______,                            _______, _______, _______,                KC_INS, _______,  KC_DEL, _______),
+  
 };
+
+
+const uint8_t music_map[MATRIX_ROWS][MATRIX_COLS] = LAYOUT(
+    0, 0,      40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,      0, 0, 0, 0,
+    0, 0,      26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39,      0, 0, 0, 0,
+    0, 0,      13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,          0, 0, 0, 0,
+    0, 0,      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 12,                   0, 0, 0, 0,
+    0, 0,      0, 0, 0,                     0,       0, 0, 0,               0, 0, 0, 0
+);
