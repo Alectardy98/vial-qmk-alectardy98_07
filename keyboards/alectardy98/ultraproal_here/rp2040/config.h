@@ -33,7 +33,11 @@
 
 
 #define SPI_DRIVER        SPID0
+#define SPI_MOSI_PIN      GP19       // Data in (DIN)
+#define SPI_SCK_PIN       GP18       // Clock (CLK)
+#define SPI_MISO_PIN      NO_PIN     // MAX7219 is write-only
 
-#define SPI_MOSI_PIN    GP7   // Data in (DIN)
-#define SPI_SCK_PIN    GP6   // Clock (CLK)
-#define MAX7219_CS_PIN    GP8   // Chip select / LOAD (CS)
+
+// Chip Select (any free GPIO)
+#define MAX7219_CS_PIN GP17 
+#define MAX7219_NUM_DIGITS 8   // If you truly need 9 digits, you’ll need a 2nd MAX7219.

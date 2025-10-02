@@ -33,7 +33,7 @@
       }
   },
   "matrix_pins": {
-    "cols": ["GP28", "GP27", "GP26", "GP25", "GP24", "GP23", "GP21", "GP20", "GP19", "GP18", "GP17", "GP16", "GP14", "GP13", "GP12", "GP11"],
+    "cols": ["GP28", "GP27", "GP26", "GP25", "GP24", "GP23", "GP21", "GP20", "GP15", "GP15", "GP15", "GP16", "GP14", "GP13", "GP12", "GP11"],
     "rows": ["GP9", "GP10", "GP22", "GP29"]
   },
   "layouts": {
