@@ -16,8 +16,25 @@
 
 #pragma once
 
+/* Trackpoad */
 
 #define PS2_PIO_USE_PIO1 // Force the usage of PIO1 peripheral, by default the PS2 implementation uses the PIO0 peripheral
+#define PS2_MOUSE_USE_REMOTE_MODE // Currently Requred due to bug with PS2 and Button conflicts on the matrix
+#define PS2_MOUSE_X_MULTIPLIER 3
+#define PS2_MOUSE_Y_MULTIPLIER 3
+#define PS2_MOUSE_V_MULTIPLIER 1
+
+// Use right button as the scroll-modifier
+#define PS2_MOUSE_SCROLL_BTN_MASK (1 << PS2_MOUSE_BTN_RIGHT)
+
+// If released quicker than 300 ms, send a normal right-click.
+// If held longer, suppress the click and enable scroll mode.
+#define PS2_MOUSE_SCROLL_BTN_SEND 300
+
+// Optional tuning: higher divisor = slower scroll speed
+#define PS2_MOUSE_SCROLL_DIVISOR_H 5
+#define PS2_MOUSE_SCROLL_DIVISOR_V 5
+
 
 /* Audio */
 #define AUDIO_PIN GP2

@@ -9,14 +9,39 @@
   },
   "layouts": {
     "labels": [
-        "Maxed F-Row",
-        "Split Backspace",
-        "Split Left Shift",
-        "Split Numpad Plus",
-        "Split Numpad Enter",
-        "Split Numpad Zero",
+        [
+            "F Row",
+            "Normal",
+            "Maxed"
+        ],
+        [
+            "Backspace",
+            "2u",
+            "Split"
+        ],
+        [
+            "Left Shift",
+            "Normal",
+            "Split"
+        ],
+        [
+            "Numpad Plus",
+            "Normal",
+            "Split"
+        ],
+        [
+            "Numpad Enter",
+            "Normal",
+            "Split"
+        ],
+        [
+            "Numpad Zero",
+            "Normal",
+            "Split"
+        ],
         [
             "Bottom Row",
+            "Normal",
             "7u-1u",
             "1.5u Left",
             "1.5u Right",
