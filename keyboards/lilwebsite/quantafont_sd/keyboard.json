@@ -12,12 +12,17 @@
   "bootloader": "atmel-dfu",
   "diode_direction": "COL2ROW",
   "features": {
-    "bootmagic": true,
+    "bootmagic": false,
     "mousekey": true,
     "extrakey": true,
     "console": true,
     "command": false,
     "nkro": true
+  },
+  "pins": {
+    "led595_data": "B2",
+    "led595_clk": "B1",
+    "led595_latch": "B3"
   },
   "qmk": {
     "locking": {

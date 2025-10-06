@@ -79,12 +79,6 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]) {
         }
     }
 
-    // blink indicator on change
-    if (state_changed) {
-        writePin(INDICATOR, 0);
-        wait_ms(50);
-        writePin(INDICATOR, 1);
-    }
 
     return state_changed;
 }
