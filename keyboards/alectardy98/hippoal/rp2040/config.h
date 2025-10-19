@@ -16,11 +16,8 @@
 
 #pragma once
 
-#define WS2812_RGBW
-
-
 /* Audio */
-#define AUDIO_PIN GP16
+#define AUDIO_PIN GP0
 #define AUDIO_PWM_DRIVER PWMD0
 #define AUDIO_PWM_CHANNEL RP2040_PWM_CHANNEL_A
 #define AUDIO_INIT_DELAY

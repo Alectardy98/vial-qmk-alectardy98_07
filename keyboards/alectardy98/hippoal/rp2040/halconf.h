@@ -1,4 +1,4 @@
-/* Copyright 2022 Alectardy98
+/* Copyright 2022 Jose Pablo Ramirez <jp.ramangulo@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,15 +16,7 @@
 
 #pragma once
 
-#define WS2812_RGBW
+#include_next <halconf.h>
 
-
-/* Audio */
-#define AUDIO_PIN GP16
-#define AUDIO_PWM_DRIVER PWMD0
-#define AUDIO_PWM_CHANNEL RP2040_PWM_CHANNEL_A
-#define AUDIO_INIT_DELAY
-#define AUDIO_CLICKY
-#define AUDIO_VOICES
-#define MUSIC_MAP
-
+#undef HAL_USE_PWM
+#define HAL_USE_PWM TRUE
