@@ -2,7 +2,150 @@
   "name": "Quantafont Quanta",
   "vendorId": "0xFEED",
   "productId": "0x6535",
-  "lighting": "none",
+  "customKeycodes": [
+    {"name": "KB_SEC_MODE",
+     "title": "Custom RGB",
+     "shortName": "KB_SEC_MODE"
+    },
+    {"name": "KB_CLR_SECS",
+     "title": "Clear All Sections",
+     "shortName": "CLR"
+    },
+
+    {"name": "KB_TOG_LOGO",
+     "title": "Toggle: QB Logo",
+     "shortName": "LOGO"
+    },
+    {"name": "KB_TOG_SCREEN",
+     "title": "Toggle: Screen",
+     "shortName": "SCRN"
+    },
+    {"name": "KB_TOG_CH_A",
+     "title": "Toggle: Channel A",
+     "shortName": "CH_A"
+    },
+    {"name": "KB_TOG_CH_B",
+     "title": "Toggle: Channel B",
+     "shortName": "CH_B"
+    },
+    {"name": "KB_TOG_AB_MIX",
+     "title": "Toggle: AB Mix",
+     "shortName": "MIX"
+    },
+    {"name": "KB_TOG_AB_PREV",
+     "title": "Toggle: AB Preview",
+     "shortName": "PREV"
+    },
+
+    {"name": "KB_TOG_KBD_1",
+     "title": "Toggle: KBD 1",
+     "shortName": "K1"
+    },
+    {"name": "KB_TOG_KBD_2",
+     "title": "Toggle: KBD 2",
+     "shortName": "K2"
+    },
+    {"name": "KB_TOG_KBD_3",
+     "title": "Toggle: KBD 3",
+     "shortName": "K3"
+    },
+    {"name": "KB_TOG_KBD_4",
+     "title": "Toggle: KBD 4",
+     "shortName": "K4"
+    },
+    {"name": "KB_TOG_KBD_5",
+     "title": "Toggle: KBD 5",
+     "shortName": "K5"
+    },
+    {"name": "KB_TOG_KBD_6",
+     "title": "Toggle: KBD 6",
+     "shortName": "K6"
+    },
+
+    {"name": "KB_TOG_A_1",
+     "title": "Toggle: A 1",
+     "shortName": "A1"
+    },
+    {"name": "KB_TOG_A_2",
+     "title": "Toggle: A 2",
+     "shortName": "A2"
+    },
+    {"name": "KB_TOG_A_3",
+     "title": "Toggle: A 3",
+     "shortName": "A3"
+    },
+    {"name": "KB_TOG_A_4",
+     "title": "Toggle: A 4",
+     "shortName": "A4"
+    },
+    {"name": "KB_TOG_A_5",
+     "title": "Toggle: A 5",
+     "shortName": "A5"
+    },
+    {"name": "KB_TOG_A_6",
+     "title": "Toggle: A 6",
+     "shortName": "A6"
+    },
+
+    {"name": "KB_TOG_B_1",
+     "title": "Toggle: B 1",
+     "shortName": "B1"
+    },
+    {"name": "KB_TOG_B_2",
+     "title": "Toggle: B 2",
+     "shortName": "B2"
+    },
+    {"name": "KB_TOG_B_3",
+     "title": "Toggle: B 3",
+     "shortName": "B3"
+    },
+    {"name": "KB_TOG_B_4",
+     "title": "Toggle: B 4",
+     "shortName": "B4"
+    },
+    {"name": "KB_TOG_B_5",
+     "title": "Toggle: B 5",
+     "shortName": "B5"
+    },
+    {"name": "KB_TOG_B_6",
+     "title": "Toggle: B 6",
+     "shortName": "B6"
+    },
+
+    {"name": "KB_DISP_WHT",
+     "title": "Display Color: White",
+     "shortName": "WHT"
+    },
+    {"name": "KB_DISP_GRY",
+     "title": "Display Color: Gray",
+     "shortName": "GRY"
+    },
+    {"name": "KB_DISP_RED",
+     "title": "Display Color: Red",
+     "shortName": "RED"
+    },
+    {"name": "KB_DISP_MAG",
+     "title": "Display Color: Magenta",
+     "shortName": "MAG"
+    },
+    {"name": "KB_DISP_BLU",
+     "title": "Display Color: Blue",
+     "shortName": "BLU"
+    },
+    {"name": "KB_DISP_CYN",
+     "title": "Display Color: Cyan",
+     "shortName": "CYN"
+    },
+    {"name": "KB_DISP_GRN",
+     "title": "Display Color: Green",
+     "shortName": "GRN"
+    },
+    {"name": "KB_DISP_YLW",
+     "title": "Display Color: Yellow",
+     "shortName": "YLW"
+    }
+  ],
+  "lighting": "vialrgb",
   "matrix": {
       "rows": 8,
       "cols": 16

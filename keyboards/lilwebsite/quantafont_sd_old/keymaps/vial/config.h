@@ -7,5 +7,3 @@
 #define VIAL_COMBO_ENTRIES 4
 #define VIAL_KEY_OVERRIDE_ENTRIES 4
 
-#define VIALRGB_NO_DIRECT
-#define RGB_MATRIX_SLEEP // turn off effects when suspended
