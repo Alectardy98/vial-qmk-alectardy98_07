@@ -118,6 +118,13 @@ static uint8_t  num_step  = 0;
 #define USERCFG_SIG       0xA5u
 #define USERCFG_SIG_SHIFT 24u
 
+// ---- FIX: debounce EEPROM writes to avoid freezes ----
+#ifndef USERCFG_SAVE_DELAY_MS
+#    define USERCFG_SAVE_DELAY_MS 500
+#endif
+static bool     usercfg_dirty = false;
+static uint32_t usercfg_timer = 0;
+
 static inline void apply_disp_idx(uint8_t idx) {
     disp_idx = idx & 0x07;
 
@@ -135,7 +142,6 @@ static inline void apply_disp_idx(uint8_t idx) {
 }
 
 static inline uint32_t pack_user_cfg(void) {
-    // IMPORTANT: cast to uint32_t and shift only 24 (never >= 32)
     uint32_t v = ((uint32_t)USERCFG_SIG << USERCFG_SIG_SHIFT);
     v |= (uint32_t)(section_mask & 0x3F);
     v |= ((uint32_t)(disp_idx & 0x07)) << 6;
@@ -151,14 +157,25 @@ static inline bool unpack_user_cfg(uint32_t v) {
     return true;
 }
 
-static inline void save_user_cfg(void) {
+static inline void save_user_cfg_now(void) {
     eeconfig_update_user(pack_user_cfg());
+    usercfg_dirty = false;
 }
 
-static inline void apply_preset_and_save(void) {
+static inline void request_user_cfg_save(void) {
+    usercfg_dirty = true;
+    usercfg_timer = timer_read32();
+}
+
+void housekeeping_task_user(void) {
+    if (usercfg_dirty && timer_elapsed32(usercfg_timer) >= USERCFG_SAVE_DELAY_MS) {
+        save_user_cfg_now();
+    }
+}
+
+static inline void apply_preset(void) {
     section_mask = (uint8_t)PRESET_SECTION_MASK;
     apply_disp_idx(DISP_RED);
-    save_user_cfg();
 
     // reset animation cleanly whenever we jump back to preset
     num_timer = timer_read32();
@@ -195,10 +212,11 @@ static inline void exit_custom_mode(void) {
 }
 
 void keyboard_post_init_user(void) {
-    // If config is missing/invalid, force your preset.
+    // If config is missing/invalid, force your preset and save once.
     uint32_t u = eeconfig_read_user();
     if (!unpack_user_cfg(u)) {
-        apply_preset_and_save();
+        apply_preset();
+        save_user_cfg_now();
     }
 
     // Always start in custom mode
@@ -249,24 +267,25 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
         case KB_CLR_SECS:
             // Reset to YOUR preset (not "all off")
-            apply_preset_and_save();
+            apply_preset();
+            save_user_cfg_now(); // immediate is fine here
             return false;
 
-        case KB_TOG_LOGO:    toggle_section_bit(BIT_QB_LOGO);    save_user_cfg(); return false;
-        case KB_TOG_SCREEN:  toggle_section_bit(BIT_SCREEN);     save_user_cfg(); return false;
-        case KB_TOG_CH_A:    toggle_section_bit(BIT_CH_A);       save_user_cfg(); return false;
-        case KB_TOG_CH_B:    toggle_section_bit(BIT_CH_B);       save_user_cfg(); return false;
-        case KB_TOG_AB_MIX:  toggle_section_bit(BIT_AB_MIX);     save_user_cfg(); return false;
-        case KB_TOG_AB_PREV: toggle_section_bit(BIT_AB_PREVIEW); save_user_cfg(); return false;
+        case KB_TOG_LOGO:    toggle_section_bit(BIT_QB_LOGO);    request_user_cfg_save(); return false;
+        case KB_TOG_SCREEN:  toggle_section_bit(BIT_SCREEN);     request_user_cfg_save(); return false;
+        case KB_TOG_CH_A:    toggle_section_bit(BIT_CH_A);       request_user_cfg_save(); return false;
+        case KB_TOG_CH_B:    toggle_section_bit(BIT_CH_B);       request_user_cfg_save(); return false;
+        case KB_TOG_AB_MIX:  toggle_section_bit(BIT_AB_MIX);     request_user_cfg_save(); return false;
+        case KB_TOG_AB_PREV: toggle_section_bit(BIT_AB_PREVIEW); request_user_cfg_save(); return false;
 
-        case KB_DISP_WHT: apply_disp_idx(DISP_WHT); save_user_cfg(); return false;
-        case KB_DISP_GRY: apply_disp_idx(DISP_GRY); save_user_cfg(); return false;
-        case KB_DISP_RED: apply_disp_idx(DISP_RED); save_user_cfg(); return false;
-        case KB_DISP_MAG: apply_disp_idx(DISP_MAG); save_user_cfg(); return false;
-        case KB_DISP_BLU: apply_disp_idx(DISP_BLU); save_user_cfg(); return false;
-        case KB_DISP_CYN: apply_disp_idx(DISP_CYN); save_user_cfg(); return false;
-        case KB_DISP_GRN: apply_disp_idx(DISP_GRN); save_user_cfg(); return false;
-        case KB_DISP_YLW: apply_disp_idx(DISP_YLW); save_user_cfg(); return false;
+        case KB_DISP_WHT: apply_disp_idx(DISP_WHT); request_user_cfg_save(); return false;
+        case KB_DISP_GRY: apply_disp_idx(DISP_GRY); request_user_cfg_save(); return false;
+        case KB_DISP_RED: apply_disp_idx(DISP_RED); request_user_cfg_save(); return false;
+        case KB_DISP_MAG: apply_disp_idx(DISP_MAG); request_user_cfg_save(); return false;
+        case KB_DISP_BLU: apply_disp_idx(DISP_BLU); request_user_cfg_save(); return false;
+        case KB_DISP_CYN: apply_disp_idx(DISP_CYN); request_user_cfg_save(); return false;
+        case KB_DISP_GRN: apply_disp_idx(DISP_GRN); request_user_cfg_save(); return false;
+        case KB_DISP_YLW: apply_disp_idx(DISP_YLW); request_user_cfg_save(); return false;
     }
     return true;
 }
@@ -308,7 +327,6 @@ static void paint_single_from_seq(const uint8_t *seq_pgm, uint8_t step,
 
 // Rainbow only for the logo (3 LEDs)
 static void paint_logo_rainbow(uint8_t led_min, uint8_t led_max, uint8_t v_cap) {
-    // Hue cycles over time
     uint8_t base_h = (uint8_t)((timer_read32() / 12) & 0xFF);
 
     for (uint8_t i = 0; i < (uint8_t)sizeof(LEDS_QB_LOGO); i++) {
@@ -355,7 +373,6 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     const uint8_t n_g = scale8(255, v);
     const uint8_t n_b = scale8(255, v);
 
-    // ---- Display groups (0–29) ----
     // Logo: rainbow when enabled
     if (bit_enabled(BIT_QB_LOGO)) {
         paint_logo_rainbow(led_min, led_max, v);
@@ -368,7 +385,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     if (bit_enabled(BIT_AB_MIX))     paint_pgm_section_scaled(LEDS_AB_MIX,     sizeof(LEDS_AB_MIX),     led_min, led_max, d_r, d_g, d_b);
     if (bit_enabled(BIT_AB_PREVIEW)) paint_pgm_section_scaled(LEDS_AB_PREVIEW, sizeof(LEDS_AB_PREVIEW), led_min, led_max, d_r, d_g, d_b);
 
-    // ---- Numbers: automatic “one-at-a-time” sequences ----
+    // Numbers: automatic “one-at-a-time” sequences
     if (bit_enabled(BIT_SCREEN)) paint_single_from_seq(SEQ_KBD, num_step, led_min, led_max, n_r, n_g, n_b);
     if (bit_enabled(BIT_CH_A))   paint_single_from_seq(SEQ_A,   num_step, led_min, led_max, n_r, n_g, n_b);
     if (bit_enabled(BIT_CH_B))   paint_single_from_seq(SEQ_B,   num_step, led_min, led_max, n_r, n_g, n_b);
