@@ -35,6 +35,10 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 #    define SECTION_MODE_MAX_VAL 100
 #endif
 
+#ifndef NUM_STEP_MS
+#    define NUM_STEP_MS 250
+#endif
+
 // ---- Display groups (0–29) ----
 static const uint8_t PROGMEM LEDS_QB_LOGO[]    = { 0, 1, 2 };
 static const uint8_t PROGMEM LEDS_SCREEN[]     = { 3, 4, 5 };
@@ -51,7 +55,7 @@ static const uint8_t PROGMEM SEQ_A[6]   = { 36, 37, 38, 39, 40, 41 };
 // B: 42=5,43=3,44=1,45=2,46=4,47=6
 static const uint8_t PROGMEM SEQ_B[6]   = { 42, 43, 44, 45, 46, 47 };
 
-// --- Section bit positions (ONLY the 6 display toggles now) ---
+// --- Section bit positions (ONLY the 6 display toggles) ---
 enum section_bits {
     BIT_QB_LOGO = 0,
     BIT_SCREEN,
@@ -61,25 +65,30 @@ enum section_bits {
     BIT_AB_PREVIEW,
 };
 
-static bool    section_mode = false;
-static uint8_t section_mask = 0; // 6 bits is enough
+static bool    section_mode = true;   // <— start in custom mode
+static uint8_t section_mask = 0;      // 6 bits
 
 // One “display color” used for ALL display LEDs (0–29)
 static uint8_t disp_r = 255;
 static uint8_t disp_g = 0;
 static uint8_t disp_b = 0;
 
+// Number animation state (declare BEFORE any functions that use it)
+static uint32_t num_timer = 0;
+static uint8_t  num_step  = 0;
+
+// Saved “native Vial RGB” state so KB_SEC_MODE can restore it
+static uint8_t saved_mode = 0;
+static uint8_t saved_hue  = 0;
+static uint8_t saved_sat  = 0;
+static uint8_t saved_val  = 0;
+static bool    saved_rgb_valid = false;
+
 static inline void set_display_color(uint8_t r, uint8_t g, uint8_t b) {
     disp_r = r; disp_g = g; disp_b = b;
 }
-
-static inline void toggle_section_bit(uint8_t bit) {
-    section_mask ^= (1u << bit);
-}
-
-static inline bool bit_enabled(uint8_t bit) {
-    return (section_mask & (1u << bit)) != 0;
-}
+static inline void toggle_section_bit(uint8_t bit) { section_mask ^= (1u << bit); }
+static inline bool bit_enabled(uint8_t bit) { return (section_mask & (1u << bit)) != 0; }
 
 // ---------- Persist section_mask + disp RGB in eeconfig_user() ----------
 // Layout (32-bit):
@@ -95,36 +104,51 @@ static inline uint32_t pack_user_cfg(void) {
     v |= ((uint32_t)disp_b) << 22;
     return v;
 }
-
 static inline void unpack_user_cfg(uint32_t v) {
     section_mask = (uint8_t)(v & 0x3F);
     disp_r = (uint8_t)((v >> 6)  & 0xFF);
     disp_g = (uint8_t)((v >> 14) & 0xFF);
     disp_b = (uint8_t)((v >> 22) & 0xFF);
 
-    // if user cfg was never set, it might come in as 0's — pick a sane default
+    // if never set (all zero), choose a sane default
     if (disp_r == 0 && disp_g == 0 && disp_b == 0) {
         set_display_color(255, 0, 0);
     }
 }
+static inline void save_user_cfg(void) { eeconfig_update_user(pack_user_cfg()); }
 
-static inline void save_user_cfg(void) {
-    eeconfig_update_user(pack_user_cfg());
-}
-
+// Make sure we DO NOT wipe Vial EEPROM; only touch eeconfig_user()
 void keyboard_post_init_user(void) {
     uint32_t u = eeconfig_read_user();
     if (u == 0xFFFFFFFFu) {
-        // uninitialized user dword: set defaults WITHOUT wiping Vial’s EEPROM
         section_mask = 0;
         set_display_color(255, 0, 0);
         save_user_cfg();
     } else {
         unpack_user_cfg(u);
     }
+
+    // Capture whatever Vial/QMK had active at boot BEFORE we take over
+    saved_mode = rgb_matrix_get_mode();
+    saved_hue  = rgb_matrix_get_hue();
+    saved_sat  = rgb_matrix_get_sat();
+    saved_val  = rgb_matrix_get_val();
+    saved_rgb_valid = true;
+
+    // Start in custom mode and force a simple base so effects don't repaint
+    section_mode = true;
+    rgb_matrix_enable_noeeprom();
+    rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
+
+    uint8_t v = rgb_matrix_get_val();
+    if (v > SECTION_MODE_MAX_VAL) v = SECTION_MODE_MAX_VAL;
+    rgb_matrix_sethsv_noeeprom(rgb_matrix_get_hue(), rgb_matrix_get_sat(), v);
+
+    num_timer = timer_read32();
+    num_step  = 0;
 }
 
-// Keyboard-specific custom keycodes (QK_KB_0 style)
+// Keyboard-specific custom keycodes
 enum custom_keycodes {
     KB_SEC_MODE = QK_KB_0,
     KB_CLR_SECS,
@@ -137,7 +161,7 @@ enum custom_keycodes {
     KB_TOG_AB_MIX,
     KB_TOG_AB_PREV,
 
-    // Display color keycodes (apply to LEDs 0–29 only)
+    // Display color keys (apply to LEDs 0–29 only)
     KB_DISP_WHT,
     KB_DISP_GRY,
     KB_DISP_RED,
@@ -148,21 +172,45 @@ enum custom_keycodes {
     KB_DISP_YLW,
 };
 
+static inline void enter_custom_mode(void) {
+    // Save current (native) state so we can restore it on exit
+    saved_mode = rgb_matrix_get_mode();
+    saved_hue  = rgb_matrix_get_hue();
+    saved_sat  = rgb_matrix_get_sat();
+    saved_val  = rgb_matrix_get_val();
+    saved_rgb_valid = true;
+
+    rgb_matrix_enable_noeeprom();
+    rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
+
+    uint8_t v = rgb_matrix_get_val();
+    if (v > SECTION_MODE_MAX_VAL) v = SECTION_MODE_MAX_VAL;
+    rgb_matrix_sethsv_noeeprom(rgb_matrix_get_hue(), rgb_matrix_get_sat(), v);
+
+    num_timer = timer_read32();
+    num_step  = 0;
+}
+
+static inline void exit_to_vial_mode(void) {
+    // Restore whatever was active when we entered custom mode
+    if (saved_rgb_valid) {
+        rgb_matrix_enable_noeeprom();
+        rgb_matrix_mode_noeeprom(saved_mode);
+        rgb_matrix_sethsv_noeeprom(saved_hue, saved_sat, saved_val);
+    }
+    // IMPORTANT: do NOT disable rgb_matrix; Vial expects it available
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (!record->event.pressed) return true;
 
     switch (keycode) {
         case KB_SEC_MODE:
             section_mode = !section_mode;
-
             if (section_mode) {
-                rgb_matrix_enable_noeeprom();
-                rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
-
-                // cap brightness in section mode (brownout protection)
-                uint8_t v = rgb_matrix_get_val();
-                if (v > SECTION_MODE_MAX_VAL) v = SECTION_MODE_MAX_VAL;
-                rgb_matrix_sethsv_noeeprom(rgb_matrix_get_hue(), rgb_matrix_get_sat(), v);
+                enter_custom_mode();
+            } else {
+                exit_to_vial_mode();
             }
             return false;
 
@@ -190,10 +238,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     return true;
 }
 
-// ---- Small helpers (cheap on AVR) ----
-static inline uint8_t scale8(uint8_t c, uint8_t v) {
-    return (uint16_t)c * v / 255;
-}
+// ---- Cheap helpers ----
+static inline uint8_t scale8(uint8_t c, uint8_t v) { return (uint16_t)c * v / 255; }
 
 static void paint_pgm_section_scaled(const uint8_t *arr_pgm, uint8_t len,
                                      uint8_t led_min, uint8_t led_max,
@@ -205,9 +251,7 @@ static void paint_pgm_section_scaled(const uint8_t *arr_pgm, uint8_t len,
         uint8_t idx = arr_pgm[i];
 #endif
         if (idx >= RGB_MATRIX_LED_COUNT) continue;
-        if (idx >= led_min && idx < led_max) {
-            rgb_matrix_set_color(idx, r, g, b);
-        }
+        if (idx >= led_min && idx < led_max) rgb_matrix_set_color(idx, r, g, b);
     }
 }
 
@@ -220,49 +264,36 @@ static void paint_single_from_seq(const uint8_t *seq_pgm, uint8_t step,
     uint8_t idx = seq_pgm[step];
 #endif
     if (idx >= RGB_MATRIX_LED_COUNT) return;
-    if (idx >= led_min && idx < led_max) {
-        rgb_matrix_set_color(idx, r, g, b);
-    }
+    if (idx >= led_min && idx < led_max) rgb_matrix_set_color(idx, r, g, b);
 }
 
-// ---- Number animation state ----
-#ifndef NUM_STEP_MS
-#    define NUM_STEP_MS 250
-#endif
-
-static uint32_t num_timer = 0;
-static uint8_t  num_step  = 0;
-
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    if (!section_mode) return true;
+    if (!section_mode) return true; // Vial native RGB
 
     // Clear ONLY this batch
-    for (uint8_t i = led_min; i < led_max; i++) {
-        rgb_matrix_set_color(i, 0, 0, 0);
-    }
+    for (uint8_t i = led_min; i < led_max; i++) rgb_matrix_set_color(i, 0, 0, 0);
 
-    // Update animation step
+    // Step animation
     if (timer_elapsed32(num_timer) >= NUM_STEP_MS) {
         num_timer = timer_read32();
-        num_step++;
-        if (num_step >= 6) num_step = 0;
+        num_step = (num_step + 1) % 6;
     }
 
     // Brightness cap
     uint8_t v = rgb_matrix_get_val();
     if (v > SECTION_MODE_MAX_VAL) v = SECTION_MODE_MAX_VAL;
 
-    // Display color scaled
+    // Display color (0–29)
     const uint8_t d_r = scale8(disp_r, v);
     const uint8_t d_g = scale8(disp_g, v);
     const uint8_t d_b = scale8(disp_b, v);
 
-    // Number colors (pick what you want; these keep your old intent)
-    const uint8_t kbd_r = scale8(255, v), kbd_g = scale8(255, v), kbd_b = scale8(255, v);
-    const uint8_t a_r   = scale8(  0, v), a_g   = scale8( 80, v), a_b   = scale8(255, v);
-    const uint8_t b_r   = scale8(255, v), b_g   = scale8(200, v), b_b   = scale8(  0, v);
+    // Numbers: ALL WHITE (KBD/A/B)
+    const uint8_t n_r = scale8(255, v);
+    const uint8_t n_g = scale8(255, v);
+    const uint8_t n_b = scale8(255, v);
 
-    // ---- Display groups (0–29): ALL use chosen display color ----
+    // Display groups (0–29)
     if (bit_enabled(BIT_QB_LOGO))    paint_pgm_section_scaled(LEDS_QB_LOGO,    sizeof(LEDS_QB_LOGO),    led_min, led_max, d_r, d_g, d_b);
     if (bit_enabled(BIT_SCREEN))     paint_pgm_section_scaled(LEDS_SCREEN,     sizeof(LEDS_SCREEN),     led_min, led_max, d_r, d_g, d_b);
     if (bit_enabled(BIT_CH_A))       paint_pgm_section_scaled(LEDS_CH_A,       sizeof(LEDS_CH_A),       led_min, led_max, d_r, d_g, d_b);
@@ -270,10 +301,10 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     if (bit_enabled(BIT_AB_MIX))     paint_pgm_section_scaled(LEDS_AB_MIX,     sizeof(LEDS_AB_MIX),     led_min, led_max, d_r, d_g, d_b);
     if (bit_enabled(BIT_AB_PREVIEW)) paint_pgm_section_scaled(LEDS_AB_PREVIEW, sizeof(LEDS_AB_PREVIEW), led_min, led_max, d_r, d_g, d_b);
 
-    // ---- Numbers: automatic “one-at-a-time” sequences ----
-    if (bit_enabled(BIT_SCREEN)) paint_single_from_seq(SEQ_KBD, num_step, led_min, led_max, kbd_r, kbd_g, kbd_b);
-    if (bit_enabled(BIT_CH_A))   paint_single_from_seq(SEQ_A,   num_step, led_min, led_max, a_r,   a_g,   a_b);
-    if (bit_enabled(BIT_CH_B))   paint_single_from_seq(SEQ_B,   num_step, led_min, led_max, b_r,   b_g,   b_b);
+    // Numbers: one-at-a-time sequences
+    if (bit_enabled(BIT_SCREEN)) paint_single_from_seq(SEQ_KBD, num_step, led_min, led_max, n_r, n_g, n_b);
+    if (bit_enabled(BIT_CH_A))   paint_single_from_seq(SEQ_A,   num_step, led_min, led_max, n_r, n_g, n_b);
+    if (bit_enabled(BIT_CH_B))   paint_single_from_seq(SEQ_B,   num_step, led_min, led_max, n_r, n_g, n_b);
 
     return false;
 }
