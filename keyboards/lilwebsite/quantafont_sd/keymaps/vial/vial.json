@@ -3,73 +3,86 @@
   "vendorId": "0xFEED",
   "productId": "0x6535",
   "customKeycodes": [
-    {"name": "KB_SEC_MODE",
-     "title": "Custom RGB",
-     "shortName": "KB_SEC_MODE"
-    },
-    {"name": "KB_CLR_SECS",
-     "title": "Clear All Sections",
-     "shortName": "CLR"
-    },
+      {"name": "MODE",
+       "title": "Custom RGB Mode",
+       "shortName": "MODE"
+      },
+      {"name": "RSET",
+       "title": "Reset Sections + Colors",
+       "shortName": "RSET"
+      },
 
-    {"name": "KB_TOG_LOGO",
-     "title": "Toggle: QB Logo",
-     "shortName": "LOGO"
-    },
-    {"name": "KB_TOG_SCREEN",
-     "title": "Toggle: Screen",
-     "shortName": "SCRN"
-    },
-    {"name": "KB_TOG_CH_A",
-     "title": "Toggle: Channel A",
-     "shortName": "CH_A"
-    },
-    {"name": "KB_TOG_CH_B",
-     "title": "Toggle: Channel B",
-     "shortName": "CH_B"
-    },
-    {"name": "KB_TOG_AB_MIX",
-     "title": "Toggle: AB Mix",
-     "shortName": "MIX"
-    },
-    {"name": "KB_TOG_AB_PREV",
-     "title": "Toggle: AB Preview",
-     "shortName": "PREV"
-    },
+      {"name": "LOGO",
+       "title": "Toggle: QB Logo",
+       "shortName": "LOGO"
+      },
+      {"name": "SCRN",
+       "title": "Toggle: Screen",
+       "shortName": "SCRN"
+      },
+      {"name": "CHNA",
+       "title": "Toggle: Channel A",
+       "shortName": "CHNA"
+      },
+      {"name": "CHNB",
+       "title": "Toggle: Channel B",
+       "shortName": "CHNB"
+      },
+      {"name": "MIXD",
+       "title": "Toggle: AB Mix",
+       "shortName": "MIXD"
+      },
+      {"name": "PRVW",
+       "title": "Toggle: AB Preview",
+       "shortName": "PRVW"
+      },
 
-    {"name": "KB_DISP_WHT",
-     "title": "Display Color: White",
-     "shortName": "WHT"
-    },
-    {"name": "KB_DISP_GRY",
-     "title": "Display Color: Gray",
-     "shortName": "GRY"
-    },
-    {"name": "KB_DISP_RED",
-     "title": "Display Color: Red",
-     "shortName": "RED"
-    },
-    {"name": "KB_DISP_MAG",
-     "title": "Display Color: Magenta",
-     "shortName": "MAG"
-    },
-    {"name": "KB_DISP_BLU",
-     "title": "Display Color: Blue",
-     "shortName": "BLU"
-    },
-    {"name": "KB_DISP_CYN",
-     "title": "Display Color: Cyan",
-     "shortName": "CYN"
-    },
-    {"name": "KB_DISP_GRN",
-     "title": "Display Color: Green",
-     "shortName": "GRN"
-    },
-    {"name": "KB_DISP_YLW",
-     "title": "Display Color: Yellow",
-     "shortName": "YLW"
-    }
-  ],
+      {"name": "CWHT",
+       "title": "Color: White (Lit Sections)",
+       "shortName": "CWHT"
+      },
+      {"name": "CGRY",
+       "title": "Color: Gray (Lit Sections)",
+       "shortName": "CGRY"
+      },
+      {"name": "CRED",
+       "title": "Color: Red (Lit Sections)",
+       "shortName": "CRED"
+      },
+      {"name": "CMAG",
+       "title": "Color: Magenta (Lit Sections)",
+       "shortName": "CMAG"
+      },
+      {"name": "CBLU",
+       "title": "Color: Blue (Lit Sections)",
+       "shortName": "CBLU"
+      },
+      {"name": "CCYN",
+       "title": "Color: Cyan (Lit Sections)",
+       "shortName": "CCYN"
+      },
+      {"name": "CGRN",
+       "title": "Color: Green (Lit Sections)",
+       "shortName": "CGRN"
+      },
+      {"name": "CYLW",
+       "title": "Color: Yellow (Lit Sections)",
+       "shortName": "CYLW"
+      },
+
+      {"name": "NKBD",
+       "title": "Numbers: KBD Animate Toggle",
+       "shortName": "NKBD"
+      },
+      {"name": "NCHA",
+       "title": "Numbers: Ch A Animate Toggle",
+       "shortName": "NCHA"
+      },
+      {"name": "NCHB",
+       "title": "Numbers: Ch B Animate Toggle",
+       "shortName": "NCHB"
+      }
+    ],
   "lighting": "vialrgb",
   "matrix": {
       "rows": 8,
