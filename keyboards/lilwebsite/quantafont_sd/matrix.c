@@ -1,84 +1,80 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <avr/io.h>
-#include "wait.h"
-#include "action_layer.h"
-#include "print.h"
-#include "debug.h"
-#include "util.h"
+
 #include "matrix.h"
-#include "led.h"
-#include <util/atomic.h>
+#include "wait.h"
+#include "gpio.h"
 
-#define INDICATOR B7
-
+// Keep the global matrix from QMK
 extern matrix_row_t matrix[MATRIX_ROWS];
 
-void matrix_init_user(void)
-{
-    debug_enable = true;
-    debug_matrix = true;
+// Row-address outputs (your decoder/select lines)
+#define ROW_A F0
+#define ROW_B F1
+#define ROW_C F4
+#define ROW_D F5
 
-    // indicator LED
-    setPinOutput(INDICATOR);
-    writePin(INDICATOR, 1);
+static inline void select_row(uint8_t r) {
+    writePin(ROW_A, (r >> 0) & 1);
+    writePin(ROW_B, (r >> 1) & 1);
+    writePin(ROW_C, (r >> 2) & 1);
+    writePin(ROW_D, (r >> 3) & 1);
+}
 
+// QMK calls this (not matrix_init_user) for custom matrices
+void matrix_init_custom(void) {
     // row address outputs
-    setPinOutput(F0); // A
-    setPinOutput(F1); // B
-    setPinOutput(F4); // C
-    setPinOutput(F5); // D
+    setPinOutput(ROW_A);
+    setPinOutput(ROW_B);
+    setPinOutput(ROW_C);
+    setPinOutput(ROW_D);
 
-    // column inputs with pull-ups
+    // default row select = 0
+    select_row(0);
+
+    // column inputs with pull-ups on PORTD (D0..D7)
     DDRD  = 0x00;
     PORTD = 0xFF;
 }
 
-void matrix_clear(void)
-{
-    for (uint8_t x = 0; x < MATRIX_ROWS; x++) {
-        matrix[x] = 0;
+void matrix_clear(void) {
+    for (uint8_t i = 0; i < MATRIX_ROWS; i++) {
+        matrix[i] = 0;
     }
 }
 
+// Returns true if the matrix changed
 bool matrix_scan_custom(matrix_row_t current_matrix[]) {
-    bool state_changed = false;
+    bool changed = false;
 
-    // temporary storage per column
-    matrix_row_t new_matrix[MATRIX_ROWS];
-    for (uint8_t c = 0; c < MATRIX_ROWS; c++) {
-        new_matrix[c] = 0;
-    }
+    matrix_row_t new_matrix[MATRIX_ROWS] = {0};
 
-    // scan all physical rows (driven by F0/F1/F4/F5)
+    // Scan all physical rows (0..MATRIX_COLS-1) via address lines
     for (uint8_t r = 0; r < MATRIX_COLS; r++) {
-        // drive row address
-        writePin(F0, (r >> 0) & 1);
-        writePin(F1, (r >> 1) & 1);
-        writePin(F4, (r >> 2) & 1);
-        writePin(F5, (r >> 3) & 1);
+        select_row(r);
+        wait_us(30);  // settle time
 
-        wait_us(20);
+        // With pull-ups: idle=1, pressed=0 => invert so pressed becomes 1
+        uint8_t pins = (uint8_t)~PIND;
 
-        // read all physical columns
-        uint8_t pins = PIND;
-
-        // transpose: each column bit goes into matrix[col] with row-bit set
+        // TRANSPOSE (keep your “rows/cols reversed” behavior):
+        // each PORTD bit (column) becomes a "row index" in QMK,
+        // and the selected row number becomes the bit position.
         for (uint8_t c = 0; c < MATRIX_ROWS; c++) {
-            if (pins & (1 << c)) {
-                new_matrix[c] |= (1 << r);
+            if (pins & (1u << c)) {
+                new_matrix[c] |= ((matrix_row_t)1u << r);
             }
         }
     }
 
-    // compare against old and update
+    // compare and update
     for (uint8_t c = 0; c < MATRIX_ROWS; c++) {
         if (current_matrix[c] != new_matrix[c]) {
-            state_changed = true;
             current_matrix[c] = new_matrix[c];
+            changed = true;
         }
     }
 
-
-    return state_changed;
+    return changed;
 }

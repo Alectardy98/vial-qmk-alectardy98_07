@@ -7,3 +7,7 @@
 #define VIAL_COMBO_ENTRIES 4
 #define VIAL_KEY_OVERRIDE_ENTRIES 4
 
+#define VIALRGB_NO_DIRECT
+#define RGB_MATRIX_SLEEP // turn off effects when suspended
+#define RGB_MATRIX_DEFAULT_MODE RGB_MATRIX_RAINBOW_MOVING_CHEVRON
+#define RGB_MATRIX_DEFAULT_SPD 25 // Sets the default animation speed, if none has been set
