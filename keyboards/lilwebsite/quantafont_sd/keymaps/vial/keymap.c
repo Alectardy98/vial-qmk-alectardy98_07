@@ -77,7 +77,7 @@ enum section_bits {
 // - AB Preview ON (red)
 #define PRESET_SECTION_MASK ((1u << BIT_QB_LOGO) | (1u << BIT_SCREEN) | (1u << BIT_AB_MIX) | (1u << BIT_AB_PREVIEW))
 
-// ---- Color palette index (so we can persist cheaply) ----
+// ---- Color palette index ----
 enum disp_color_idx {
     DISP_WHT = 0,
     DISP_GRY,
@@ -89,12 +89,25 @@ enum disp_color_idx {
     DISP_YLW,
 };
 
-static bool    section_mode = true;     // start in custom mode
-static uint8_t section_mask = 0;        // 6 bits
-static uint8_t disp_idx     = DISP_RED; // default red for non-logo display LEDs
+// ---- Per-section color storage (NEW) ----
+// We store one idx per lit-able non-logo section:
+//   Screen, ChA, ChB, AB Mix, AB Preview
+enum disp_group {
+    GRP_SCREEN = 0,
+    GRP_CH_A,
+    GRP_CH_B,
+    GRP_AB_MIX,
+    GRP_AB_PREVIEW,
+    GRP_COUNT
+};
 
-// Derived RGB for the chosen display color
-static uint8_t disp_r = 255, disp_g = 0, disp_b = 0;
+static bool    section_mode = true; // start in custom mode
+static uint8_t section_mask = 0;    // 6 bits
+
+static uint8_t grp_idx[GRP_COUNT] = { DISP_RED, DISP_RED, DISP_RED, DISP_RED, DISP_RED };
+static uint8_t grp_r[GRP_COUNT]   = { 255, 255, 255, 255, 255 };
+static uint8_t grp_g[GRP_COUNT]   = {   0,   0,   0,   0,   0 };
+static uint8_t grp_b[GRP_COUNT]   = {   0,   0,   0,   0,   0 };
 
 // Save/restore Vial/native RGB state when toggling modes
 static bool    saved_enabled = false;
@@ -121,7 +134,7 @@ static uint8_t  num_step  = 0;
 static bool     usercfg_dirty = false;
 static uint32_t usercfg_timer = 0;
 
-// ---- NEW: FN override mask (render-time only, no EEPROM writes) ----
+// ---- FN override mask (render-time only, no EEPROM writes) ----
 static inline uint8_t effective_section_mask(void) {
     uint8_t m = section_mask;
     if (layer_state_is(_FN)) {
@@ -131,26 +144,54 @@ static inline uint8_t effective_section_mask(void) {
     return m;
 }
 
-static inline void apply_disp_idx(uint8_t idx) {
-    disp_idx = idx & 0x07;
-
-    switch (disp_idx) {
-        case DISP_WHT: disp_r = 255; disp_g = 255; disp_b = 255; break;
-        case DISP_GRY: disp_r = 128; disp_g = 128; disp_b = 128; break;
-        case DISP_RED: disp_r = 255; disp_g =   0; disp_b =   0; break;
-        case DISP_MAG: disp_r = 255; disp_g =   0; disp_b = 255; break;
-        case DISP_BLU: disp_r =   0; disp_g =   0; disp_b = 255; break;
-        case DISP_CYN: disp_r =   0; disp_g = 255; disp_b = 255; break;
-        case DISP_GRN: disp_r =   0; disp_g = 255; disp_b =   0; break;
-        case DISP_YLW: disp_r = 255; disp_g = 255; disp_b =   0; break;
-        default:       disp_r = 255; disp_g =   0; disp_b =   0; break;
+// ---------- Color helpers ----------
+static inline void idx_to_rgb(uint8_t idx, uint8_t *r, uint8_t *g, uint8_t *b) {
+    switch (idx & 0x07) {
+        case DISP_WHT: *r = 255; *g = 255; *b = 255; break;
+        case DISP_GRY: *r = 128; *g = 128; *b = 128; break;
+        case DISP_RED: *r = 255; *g =   0; *b =   0; break;
+        case DISP_MAG: *r = 255; *g =   0; *b = 255; break;
+        case DISP_BLU: *r =   0; *g =   0; *b = 255; break;
+        case DISP_CYN: *r =   0; *g = 255; *b = 255; break;
+        case DISP_GRN: *r =   0; *g = 255; *b =   0; break;
+        case DISP_YLW: *r = 255; *g = 255; *b =   0; break;
+        default:       *r = 255; *g =   0; *b =   0; break;
     }
 }
 
+static inline void set_group_idx(enum disp_group g, uint8_t idx) {
+    grp_idx[g] = idx & 0x07;
+    idx_to_rgb(grp_idx[g], &grp_r[g], &grp_g[g], &grp_b[g]);
+}
+
+// NEW: apply a color to ONLY the sections that are currently lit
+static inline void apply_color_to_currently_lit(uint8_t idx) {
+    uint8_t m = effective_section_mask();
+
+    if (m & (1u << BIT_SCREEN))     set_group_idx(GRP_SCREEN,     idx);
+    if (m & (1u << BIT_CH_A))       set_group_idx(GRP_CH_A,       idx);
+    if (m & (1u << BIT_CH_B))       set_group_idx(GRP_CH_B,       idx);
+    if (m & (1u << BIT_AB_MIX))     set_group_idx(GRP_AB_MIX,     idx);
+    if (m & (1u << BIT_AB_PREVIEW)) set_group_idx(GRP_AB_PREVIEW, idx);
+}
+
+// ---------- EEPROM pack/unpack ----------
+// Layout:
+//   bits 0..5   section_mask
+//   bits 6..8   screen idx
+//   bits 9..11  ch_a idx
+//   bits 12..14 ch_b idx
+//   bits 15..17 ab_mix idx
+//   bits 18..20 ab_prev idx
+//   bits 24..31 signature
 static inline uint32_t pack_user_cfg(void) {
     uint32_t v = ((uint32_t)USERCFG_SIG << USERCFG_SIG_SHIFT);
     v |= (uint32_t)(section_mask & 0x3F);
-    v |= ((uint32_t)(disp_idx & 0x07)) << 6;
+    v |= ((uint32_t)(grp_idx[GRP_SCREEN]     & 0x07)) << 6;
+    v |= ((uint32_t)(grp_idx[GRP_CH_A]       & 0x07)) << 9;
+    v |= ((uint32_t)(grp_idx[GRP_CH_B]       & 0x07)) << 12;
+    v |= ((uint32_t)(grp_idx[GRP_AB_MIX]     & 0x07)) << 15;
+    v |= ((uint32_t)(grp_idx[GRP_AB_PREVIEW] & 0x07)) << 18;
     return v;
 }
 
@@ -159,7 +200,13 @@ static inline bool unpack_user_cfg(uint32_t v) {
     if (sig != (uint8_t)USERCFG_SIG) return false;
 
     section_mask = (uint8_t)(v & 0x3F);
-    apply_disp_idx((uint8_t)((v >> 6) & 0x07));
+
+    set_group_idx(GRP_SCREEN,     (uint8_t)((v >> 6)  & 0x07));
+    set_group_idx(GRP_CH_A,       (uint8_t)((v >> 9)  & 0x07));
+    set_group_idx(GRP_CH_B,       (uint8_t)((v >> 12) & 0x07));
+    set_group_idx(GRP_AB_MIX,     (uint8_t)((v >> 15) & 0x07));
+    set_group_idx(GRP_AB_PREVIEW, (uint8_t)((v >> 18) & 0x07));
+
     return true;
 }
 
@@ -179,9 +226,16 @@ void housekeeping_task_user(void) {
     }
 }
 
+// ---------- Preset ----------
 static inline void apply_preset(void) {
     section_mask = (uint8_t)PRESET_SECTION_MASK;
-    apply_disp_idx(DISP_RED);
+
+    // Default your per-section colors (red baseline)
+    set_group_idx(GRP_SCREEN,     DISP_RED);
+    set_group_idx(GRP_CH_A,       DISP_RED);
+    set_group_idx(GRP_CH_B,       DISP_RED);
+    set_group_idx(GRP_AB_MIX,     DISP_RED);
+    set_group_idx(GRP_AB_PREVIEW, DISP_RED);
 
     num_timer = timer_read32();
     num_step  = 0;
@@ -238,7 +292,7 @@ enum custom_keycodes {
     KB_TOG_AB_MIX,
     KB_TOG_AB_PREV,
 
-    // Display color keycodes (affect non-logo display LEDs 0–29)
+    // Display color keycodes (NOW: only affect currently lit sections)
     KB_DISP_WHT,
     KB_DISP_GRY,
     KB_DISP_RED,
@@ -273,14 +327,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case KB_TOG_AB_MIX:  toggle_section_bit(BIT_AB_MIX);     request_user_cfg_save(); return false;
         case KB_TOG_AB_PREV: toggle_section_bit(BIT_AB_PREVIEW); request_user_cfg_save(); return false;
 
-        case KB_DISP_WHT: apply_disp_idx(DISP_WHT); request_user_cfg_save(); return false;
-        case KB_DISP_GRY: apply_disp_idx(DISP_GRY); request_user_cfg_save(); return false;
-        case KB_DISP_RED: apply_disp_idx(DISP_RED); request_user_cfg_save(); return false;
-        case KB_DISP_MAG: apply_disp_idx(DISP_MAG); request_user_cfg_save(); return false;
-        case KB_DISP_BLU: apply_disp_idx(DISP_BLU); request_user_cfg_save(); return false;
-        case KB_DISP_CYN: apply_disp_idx(DISP_CYN); request_user_cfg_save(); return false;
-        case KB_DISP_GRN: apply_disp_idx(DISP_GRN); request_user_cfg_save(); return false;
-        case KB_DISP_YLW: apply_disp_idx(DISP_YLW); request_user_cfg_save(); return false;
+        // NEW behavior: only recolor sections that are currently lit
+        case KB_DISP_WHT: apply_color_to_currently_lit(DISP_WHT); request_user_cfg_save(); return false;
+        case KB_DISP_GRY: apply_color_to_currently_lit(DISP_GRY); request_user_cfg_save(); return false;
+        case KB_DISP_RED: apply_color_to_currently_lit(DISP_RED); request_user_cfg_save(); return false;
+        case KB_DISP_MAG: apply_color_to_currently_lit(DISP_MAG); request_user_cfg_save(); return false;
+        case KB_DISP_BLU: apply_color_to_currently_lit(DISP_BLU); request_user_cfg_save(); return false;
+        case KB_DISP_CYN: apply_color_to_currently_lit(DISP_CYN); request_user_cfg_save(); return false;
+        case KB_DISP_GRN: apply_color_to_currently_lit(DISP_GRN); request_user_cfg_save(); return false;
+        case KB_DISP_YLW: apply_color_to_currently_lit(DISP_YLW); request_user_cfg_save(); return false;
     }
     return true;
 }
@@ -346,34 +401,49 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t v = rgb_matrix_get_val();
     if (v > SECTION_MODE_MAX_VAL) v = SECTION_MODE_MAX_VAL;
 
-    const uint8_t d_r = scale8(disp_r, v);
-    const uint8_t d_g = scale8(disp_g, v);
-    const uint8_t d_b = scale8(disp_b, v);
-
+    // Numbers always white
     const uint8_t n_r = scale8(255, v);
     const uint8_t n_g = scale8(255, v);
     const uint8_t n_b = scale8(255, v);
 
-    // --- NEW: use effective mask (forces ChA+ChB ON while FN layer active) ---
     const uint8_t m = effective_section_mask();
-    #define BIT_ON(_bit) ((m & (1u << (_bit))) != 0)
+#define BIT_ON(_bit) ((m & (1u << (_bit))) != 0)
 
+    // Logo: rainbow when enabled
     if (BIT_ON(BIT_QB_LOGO)) paint_logo_rainbow(led_min, led_max, v);
 
-    if (BIT_ON(BIT_SCREEN))     paint_pgm_section_scaled(LEDS_SCREEN,     sizeof(LEDS_SCREEN),     led_min, led_max, d_r, d_g, d_b);
-    if (BIT_ON(BIT_CH_A))       paint_pgm_section_scaled(LEDS_CH_A,       sizeof(LEDS_CH_A),       led_min, led_max, d_r, d_g, d_b);
-    if (BIT_ON(BIT_CH_B))       paint_pgm_section_scaled(LEDS_CH_B,       sizeof(LEDS_CH_B),       led_min, led_max, d_r, d_g, d_b);
-    if (BIT_ON(BIT_AB_MIX))     paint_pgm_section_scaled(LEDS_AB_MIX,     sizeof(LEDS_AB_MIX),     led_min, led_max, d_r, d_g, d_b);
-    if (BIT_ON(BIT_AB_PREVIEW)) paint_pgm_section_scaled(LEDS_AB_PREVIEW, sizeof(LEDS_AB_PREVIEW), led_min, led_max, d_r, d_g, d_b);
+    // Per-section colors (scaled)
+    const uint8_t scr_r = scale8(grp_r[GRP_SCREEN],     v);
+    const uint8_t scr_g = scale8(grp_g[GRP_SCREEN],     v);
+    const uint8_t scr_b = scale8(grp_b[GRP_SCREEN],     v);
+
+    const uint8_t a_r   = scale8(grp_r[GRP_CH_A],       v);
+    const uint8_t a_g   = scale8(grp_g[GRP_CH_A],       v);
+    const uint8_t a_b   = scale8(grp_b[GRP_CH_A],       v);
+
+    const uint8_t b_r   = scale8(grp_r[GRP_CH_B],       v);
+    const uint8_t b_g   = scale8(grp_g[GRP_CH_B],       v);
+    const uint8_t b_b   = scale8(grp_b[GRP_CH_B],       v);
+
+    const uint8_t mx_r  = scale8(grp_r[GRP_AB_MIX],     v);
+    const uint8_t mx_g  = scale8(grp_g[GRP_AB_MIX],     v);
+    const uint8_t mx_b  = scale8(grp_b[GRP_AB_MIX],     v);
+
+    const uint8_t pv_r  = scale8(grp_r[GRP_AB_PREVIEW], v);
+    const uint8_t pv_g  = scale8(grp_g[GRP_AB_PREVIEW], v);
+    const uint8_t pv_b  = scale8(grp_b[GRP_AB_PREVIEW], v);
+
+    // Sections
+    if (BIT_ON(BIT_SCREEN))     paint_pgm_section_scaled(LEDS_SCREEN,     sizeof(LEDS_SCREEN),     led_min, led_max, scr_r, scr_g, scr_b);
+    if (BIT_ON(BIT_CH_A))       paint_pgm_section_scaled(LEDS_CH_A,       sizeof(LEDS_CH_A),       led_min, led_max, a_r,   a_g,   a_b);
+    if (BIT_ON(BIT_CH_B))       paint_pgm_section_scaled(LEDS_CH_B,       sizeof(LEDS_CH_B),       led_min, led_max, b_r,   b_g,   b_b);
+    if (BIT_ON(BIT_AB_MIX))     paint_pgm_section_scaled(LEDS_AB_MIX,     sizeof(LEDS_AB_MIX),     led_min, led_max, mx_r,  mx_g,  mx_b);
+    if (BIT_ON(BIT_AB_PREVIEW)) paint_pgm_section_scaled(LEDS_AB_PREVIEW, sizeof(LEDS_AB_PREVIEW), led_min, led_max, pv_r,  pv_g,  pv_b);
 
     // Numbers
     if (BIT_ON(BIT_SCREEN)) paint_single_from_seq(SEQ_KBD, num_step, led_min, led_max, n_r, n_g, n_b);
     if (BIT_ON(BIT_CH_A))   paint_single_from_seq(SEQ_A,   num_step, led_min, led_max, n_r, n_g, n_b);
     if (BIT_ON(BIT_CH_B))   paint_single_from_seq(SEQ_B,   num_step, led_min, led_max, n_r, n_g, n_b);
-
-    // If you want FN to light ChA/ChB blocks BUT NOT show A/B numbers, change the two lines above to:
-    // if ((section_mask & (1u << BIT_CH_A)) != 0) paint_single_from_seq(SEQ_A, num_step, led_min, led_max, n_r, n_g, n_b);
-    // if ((section_mask & (1u << BIT_CH_B)) != 0) paint_single_from_seq(SEQ_B, num_step, led_min, led_max, n_r, n_g, n_b);
 
     return false;
 }
