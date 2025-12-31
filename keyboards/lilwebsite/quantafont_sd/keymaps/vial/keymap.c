@@ -111,19 +111,25 @@ static uint32_t num_timer = 0;
 static uint8_t  num_step  = 0;
 
 // ---- Persistent config in eeconfig_user() ----
-// We store:
-//  - signature (top byte)
-//  - section_mask (bits 0..5)
-//  - disp_idx     (bits 6..8)
 #define USERCFG_SIG       0xA5u
 #define USERCFG_SIG_SHIFT 24u
 
-// ---- FIX: debounce EEPROM writes to avoid freezes ----
+// ---- Debounce EEPROM writes to avoid freezes ----
 #ifndef USERCFG_SAVE_DELAY_MS
 #    define USERCFG_SAVE_DELAY_MS 500
 #endif
 static bool     usercfg_dirty = false;
 static uint32_t usercfg_timer = 0;
+
+// ---- NEW: FN override mask (render-time only, no EEPROM writes) ----
+static inline uint8_t effective_section_mask(void) {
+    uint8_t m = section_mask;
+    if (layer_state_is(_FN)) {
+        m |= (1u << BIT_CH_A);
+        m |= (1u << BIT_CH_B);
+    }
+    return m;
+}
 
 static inline void apply_disp_idx(uint8_t idx) {
     disp_idx = idx & 0x07;
@@ -177,13 +183,11 @@ static inline void apply_preset(void) {
     section_mask = (uint8_t)PRESET_SECTION_MASK;
     apply_disp_idx(DISP_RED);
 
-    // reset animation cleanly whenever we jump back to preset
     num_timer = timer_read32();
     num_step  = 0;
 }
 
 static inline void enter_custom_mode(void) {
-    // capture whatever Vial/native is doing right now
     saved_enabled = rgb_matrix_is_enabled();
     saved_mode    = rgb_matrix_get_mode();
     saved_hue     = rgb_matrix_get_hue();
@@ -202,7 +206,6 @@ static inline void enter_custom_mode(void) {
 }
 
 static inline void exit_custom_mode(void) {
-    // restore Vial/native state
     if (!saved_enabled) {
         rgb_matrix_disable_noeeprom();
         return;
@@ -212,14 +215,12 @@ static inline void exit_custom_mode(void) {
 }
 
 void keyboard_post_init_user(void) {
-    // If config is missing/invalid, force your preset and save once.
     uint32_t u = eeconfig_read_user();
     if (!unpack_user_cfg(u)) {
         apply_preset();
         save_user_cfg_now();
     }
 
-    // Always start in custom mode
     section_mode = true;
     enter_custom_mode();
 }
@@ -248,12 +249,7 @@ enum custom_keycodes {
     KB_DISP_YLW,
 };
 
-static inline void toggle_section_bit(uint8_t bit) {
-    section_mask ^= (1u << bit);
-}
-static inline bool bit_enabled(uint8_t bit) {
-    return (section_mask & (1u << bit)) != 0;
-}
+static inline void toggle_section_bit(uint8_t bit) { section_mask ^= (1u << bit); }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (!record->event.pressed) return true;
@@ -266,9 +262,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
 
         case KB_CLR_SECS:
-            // Reset to YOUR preset (not "all off")
             apply_preset();
-            save_user_cfg_now(); // immediate is fine here
+            save_user_cfg_now();
             return false;
 
         case KB_TOG_LOGO:    toggle_section_bit(BIT_QB_LOGO);    request_user_cfg_save(); return false;
@@ -291,9 +286,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 // ---- Small helpers (cheap on AVR) ----
-static inline uint8_t scale8(uint8_t c, uint8_t v) {
-    return (uint16_t)c * v / 255;
-}
+static inline uint8_t scale8(uint8_t c, uint8_t v) { return (uint16_t)c * v / 255; }
 
 static void paint_pgm_section_scaled(const uint8_t *arr_pgm, uint8_t len,
                                      uint8_t led_min, uint8_t led_max,
@@ -305,9 +298,7 @@ static void paint_pgm_section_scaled(const uint8_t *arr_pgm, uint8_t len,
         uint8_t idx = arr_pgm[i];
 #endif
         if (idx >= RGB_MATRIX_LED_COUNT) continue;
-        if (idx >= led_min && idx < led_max) {
-            rgb_matrix_set_color(idx, r, g, b);
-        }
+        if (idx >= led_min && idx < led_max) rgb_matrix_set_color(idx, r, g, b);
     }
 }
 
@@ -320,9 +311,7 @@ static void paint_single_from_seq(const uint8_t *seq_pgm, uint8_t step,
     uint8_t idx = seq_pgm[step];
 #endif
     if (idx >= RGB_MATRIX_LED_COUNT) return;
-    if (idx >= led_min && idx < led_max) {
-        rgb_matrix_set_color(idx, r, g, b);
-    }
+    if (idx >= led_min && idx < led_max) rgb_matrix_set_color(idx, r, g, b);
 }
 
 // Rainbow only for the logo (3 LEDs)
@@ -347,48 +336,44 @@ static void paint_logo_rainbow(uint8_t led_min, uint8_t led_max, uint8_t v_cap) 
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     if (!section_mode) return true;
 
-    // Clear ONLY this batch
-    for (uint8_t i = led_min; i < led_max; i++) {
-        rgb_matrix_set_color(i, 0, 0, 0);
-    }
+    for (uint8_t i = led_min; i < led_max; i++) rgb_matrix_set_color(i, 0, 0, 0);
 
-    // Update number animation step
     if (timer_elapsed32(num_timer) >= NUM_STEP_MS) {
         num_timer = timer_read32();
-        num_step++;
-        if (num_step >= 6) num_step = 0;
+        num_step = (num_step + 1) % 6;
     }
 
-    // Brightness cap (brownout protection)
     uint8_t v = rgb_matrix_get_val();
     if (v > SECTION_MODE_MAX_VAL) v = SECTION_MODE_MAX_VAL;
 
-    // Scaled “display color” (for non-logo LEDs 0–29)
     const uint8_t d_r = scale8(disp_r, v);
     const uint8_t d_g = scale8(disp_g, v);
     const uint8_t d_b = scale8(disp_b, v);
 
-    // ALL numbers white
     const uint8_t n_r = scale8(255, v);
     const uint8_t n_g = scale8(255, v);
     const uint8_t n_b = scale8(255, v);
 
-    // Logo: rainbow when enabled
-    if (bit_enabled(BIT_QB_LOGO)) {
-        paint_logo_rainbow(led_min, led_max, v);
-    }
+    // --- NEW: use effective mask (forces ChA+ChB ON while FN layer active) ---
+    const uint8_t m = effective_section_mask();
+    #define BIT_ON(_bit) ((m & (1u << (_bit))) != 0)
 
-    // Everything else uses chosen display color (default red)
-    if (bit_enabled(BIT_SCREEN))     paint_pgm_section_scaled(LEDS_SCREEN,     sizeof(LEDS_SCREEN),     led_min, led_max, d_r, d_g, d_b);
-    if (bit_enabled(BIT_CH_A))       paint_pgm_section_scaled(LEDS_CH_A,       sizeof(LEDS_CH_A),       led_min, led_max, d_r, d_g, d_b);
-    if (bit_enabled(BIT_CH_B))       paint_pgm_section_scaled(LEDS_CH_B,       sizeof(LEDS_CH_B),       led_min, led_max, d_r, d_g, d_b);
-    if (bit_enabled(BIT_AB_MIX))     paint_pgm_section_scaled(LEDS_AB_MIX,     sizeof(LEDS_AB_MIX),     led_min, led_max, d_r, d_g, d_b);
-    if (bit_enabled(BIT_AB_PREVIEW)) paint_pgm_section_scaled(LEDS_AB_PREVIEW, sizeof(LEDS_AB_PREVIEW), led_min, led_max, d_r, d_g, d_b);
+    if (BIT_ON(BIT_QB_LOGO)) paint_logo_rainbow(led_min, led_max, v);
 
-    // Numbers: automatic “one-at-a-time” sequences
-    if (bit_enabled(BIT_SCREEN)) paint_single_from_seq(SEQ_KBD, num_step, led_min, led_max, n_r, n_g, n_b);
-    if (bit_enabled(BIT_CH_A))   paint_single_from_seq(SEQ_A,   num_step, led_min, led_max, n_r, n_g, n_b);
-    if (bit_enabled(BIT_CH_B))   paint_single_from_seq(SEQ_B,   num_step, led_min, led_max, n_r, n_g, n_b);
+    if (BIT_ON(BIT_SCREEN))     paint_pgm_section_scaled(LEDS_SCREEN,     sizeof(LEDS_SCREEN),     led_min, led_max, d_r, d_g, d_b);
+    if (BIT_ON(BIT_CH_A))       paint_pgm_section_scaled(LEDS_CH_A,       sizeof(LEDS_CH_A),       led_min, led_max, d_r, d_g, d_b);
+    if (BIT_ON(BIT_CH_B))       paint_pgm_section_scaled(LEDS_CH_B,       sizeof(LEDS_CH_B),       led_min, led_max, d_r, d_g, d_b);
+    if (BIT_ON(BIT_AB_MIX))     paint_pgm_section_scaled(LEDS_AB_MIX,     sizeof(LEDS_AB_MIX),     led_min, led_max, d_r, d_g, d_b);
+    if (BIT_ON(BIT_AB_PREVIEW)) paint_pgm_section_scaled(LEDS_AB_PREVIEW, sizeof(LEDS_AB_PREVIEW), led_min, led_max, d_r, d_g, d_b);
+
+    // Numbers
+    if (BIT_ON(BIT_SCREEN)) paint_single_from_seq(SEQ_KBD, num_step, led_min, led_max, n_r, n_g, n_b);
+    if (BIT_ON(BIT_CH_A))   paint_single_from_seq(SEQ_A,   num_step, led_min, led_max, n_r, n_g, n_b);
+    if (BIT_ON(BIT_CH_B))   paint_single_from_seq(SEQ_B,   num_step, led_min, led_max, n_r, n_g, n_b);
+
+    // If you want FN to light ChA/ChB blocks BUT NOT show A/B numbers, change the two lines above to:
+    // if ((section_mask & (1u << BIT_CH_A)) != 0) paint_single_from_seq(SEQ_A, num_step, led_min, led_max, n_r, n_g, n_b);
+    // if ((section_mask & (1u << BIT_CH_B)) != 0) paint_single_from_seq(SEQ_B, num_step, led_min, led_max, n_r, n_g, n_b);
 
     return false;
 }
