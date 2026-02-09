@@ -7,11 +7,13 @@
 #endif
 
 #ifndef MAX7219_NUM_DIGITS
-#    define MAX7219_NUM_DIGITS 8  // 1..8 supported by a single MAX7219
+// Set this to the *physical* digit count. Scanning unused digits reduces duty-cycle and makes the display look dim.
+#    define MAX7219_NUM_DIGITS 4  // 1..8 supported by a single MAX7219
 #endif
 
 #ifndef MAX7219_INTENSITY_DEFAULT
-#    define MAX7219_INTENSITY_DEFAULT 0x0C  // 0x00..0x0F
+// 0x00..0x0F. Use 0x0F for maximum brightness.
+#    define MAX7219_INTENSITY_DEFAULT 0x0F
 #endif
 
 // ---------- MAX7219 register map ----------
@@ -60,47 +62,30 @@ static inline void max7219_write_digit(uint8_t digit, uint8_t val) {
     max7219_tx((uint8_t)(REG_DIGIT0 + digit), val);
 }
 
-// ---------- Mirror helpers (mirror 0..(N/2-1) onto (N/2)..(N-1)) ----------
-static inline uint8_t max7219_partner(uint8_t d) {
-    uint8_t half = MAX7219_NUM_DIGITS / 2;
-    // For odd digit counts, partner==d for the center (we only write once).
-    return (d < MAX7219_NUM_DIGITS) ? (uint8_t)((d + half) % MAX7219_NUM_DIGITS) : d;
-}
-
-static inline void max7219_write_digit_mirrored(uint8_t d, uint8_t val) {
-    if (d >= MAX7219_NUM_DIGITS) return;
-    max7219_write_digit(d, val);
-    uint8_t p = max7219_partner(d);
-    if (p != d) max7219_write_digit(p, val);
-}
-
-static void max7219_clear_decode_mode_mirrored(void) {
-    uint8_t half = MAX7219_NUM_DIGITS / 2;
-    for (uint8_t d = 0; d < half; d++) {
-        max7219_write_digit_mirrored(d, 0x0F); // blank both halves
+// ---------- 4-digit helpers (no mirroring) ----------
+static void max7219_clear_decode_mode(void) {
+    for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) {
+        max7219_write_digit(d, 0x0F); // blank
     }
 }
 
-// Render an unsigned number mirrored across halves.
-// With 8 digits, we show up to 4 LSBs in 0..3 and copy to 4..7.
-static void max7219_show_uint32_decode_mirrored(uint32_t n) {
-    uint8_t half = MAX7219_NUM_DIGITS / 2;
-
+// Render an unsigned number into the available digits using Code-B decode.
+// Digit 0 is the least significant digit.
+static void max7219_show_uint32_decode(uint32_t n) {
     if (n == 0) {
-        max7219_write_digit_mirrored(0, 0);   // "0"
-        for (uint8_t d = 1; d < half; d++) {
-            max7219_write_digit_mirrored(d, 0x0F);
+        max7219_write_digit(0, 0); // "0"
+        for (uint8_t d = 1; d < MAX7219_NUM_DIGITS; d++) {
+            max7219_write_digit(d, 0x0F);
         }
         return;
     }
 
-    for (uint8_t d = 0; d < half; d++) {
+    for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) {
         if (n) {
-            uint8_t digit = (uint8_t)(n % 10);
-            max7219_write_digit_mirrored(d, digit);
+            max7219_write_digit(d, (uint8_t)(n % 10));
             n /= 10;
         } else {
-            max7219_write_digit_mirrored(d, 0x0F);
+            max7219_write_digit(d, 0x0F);
         }
     }
 }
@@ -116,16 +101,13 @@ void max7219_init(void) {
     max7219_tx(REG_TEST, 0x00);
 
     max7219_shutdown(false);                                   // turn on
-    max7219_set_scan_limit((uint8_t)(MAX7219_NUM_DIGITS - 1)); // digits 0..N-1
-    max7219_set_decode(0xFF);                                  // Code-B on all digits
+    max7219_set_scan_limit((uint8_t)(MAX7219_NUM_DIGITS - 1)); // for 4 digits: 0x03
+    // Enable Code-B decode only for the digits we physically have.
+    // For 4 digits this becomes 0b00001111 = 0x0F.
+    uint8_t decode_mask = (MAX7219_NUM_DIGITS >= 8) ? 0xFF : (uint8_t)((1u << MAX7219_NUM_DIGITS) - 1u);
+    max7219_set_decode(decode_mask);
     max7219_set_intensity(MAX7219_INTENSITY_DEFAULT);
-    max7219_clear_decode_mode_mirrored();                      // blanks both halves
-
-    // (Optional) sanity stamp to confirm init ran:
-    // max7219_write_digit_mirrored(0, 1);
-    // max7219_write_digit_mirrored(1, 2);
-    // max7219_write_digit_mirrored(2, 3);
-    // max7219_write_digit_mirrored(3, 4);
+    max7219_clear_decode_mode();                               // blank all digits
 }
 
 // Raw segment write (use after max7219_set_decode(0x00))
@@ -149,8 +131,8 @@ void matrix_scan_user(void) {
     uint32_t now = timer_read32();
     if (TIMER_DIFF_32(now, last) >= 200) {
         last = now;
-        max7219_show_uint32_decode_mirrored(counter++);
-        // With 8 digits mirrored (4 per half), keep to 0..9999 for clean display
+        max7219_show_uint32_decode(counter++);
+        // With 4 digits, keep to 0..9999 for clean display
         if (counter > 9999UL) counter = 0;
     }
 }

@@ -25,21 +25,3 @@
 #define AUDIO_VOICES
 #define MUSIC_MAP
 
-
-// —— 74HC595 pins ——
-#define BAR_SER_PIN    GP3
-#define BAR_SRCLK_PIN  GP1
-#define BAR_RCLK_PIN   GP2
-
-
-#define SPI_DRIVER        SPID0
-#define SPI_MOSI_PIN      GP7       // Data in (DIN)
-#define SPI_SCK_PIN       GP6       // Clock (CLK)
-#define SPI_MISO_PIN      NO_PIN     // MAX7219 is write-only
-
-
-// Chip Select (any free GPIO)
-#define MAX7219_CS_PIN GP8
-#define MAX7219_NUM_DIGITS 4   // If you truly need 9 digits, you’ll need a 2nd MAX7219.
-#define MAX7219_INTENSITY_DEFAULT 0x0F
-#define NO_USB_SUSPEND
