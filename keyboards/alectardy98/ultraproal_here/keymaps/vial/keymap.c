@@ -159,6 +159,12 @@ static inline void max7219_blank_all(void) {
     }
 }
 
+// Force "display on" state (normal operation + test off)
+static inline void max7219_force_on(void) {
+    max7219_tx(REG_SHUTDOWN, 0x01);
+    max7219_tx(REG_TEST, 0x00);
+}
+
 void max7219_init(void) {
     spi_init();
 
@@ -214,11 +220,11 @@ void keyboard_pre_init_user(void) {
 }
 
 void keyboard_post_init_user(void) {
-    max7219_init();
-
     // Hardening: make sure CS is a driven output and stays HIGH when idle
     setPinOutput(MAX7219_CS_PIN);
     writePinHigh(MAX7219_CS_PIN);
+
+    max7219_init();
 
     set_display_mode(MODE_DEFAULT); // ensure both displays OFF at boot
 }
@@ -255,7 +261,8 @@ void housekeeping_task_user(void) {
 }
 
 /* ─────────────────────────────────────────────
- * TEST MODE: MAX7219 pattern (hardened)
+ * TEST MODE: MAX7219 pattern
+ * + when the full loop finishes, force display back ON
  * ───────────────────────────────────────────── */
 void matrix_scan_user(void) {
     if (g_mode != MODE_TEST) return;
@@ -283,11 +290,18 @@ void matrix_scan_user(void) {
         max7219_write_digit(d, out[d]);
     }
 
+    // Advance state machine
     val++;
     if (val > 9) {
         val = 0;
         phase++;
-        if (phase > 4) phase = 0;
+        if (phase > 4) {
+            // Completed the full loop (0..4). Wrap back to 0 and "force on".
+            phase = 0;
+
+            // Force display back ON (normal op + test off)
+            max7219_force_on();
+        }
     }
 }
 
