@@ -102,8 +102,8 @@ static inline void segments_all_on(void) {
 
 static inline void segment_set(uint8_t seg, bool on) {
     switch (seg) {
-        case 1: if (on) writePinLow(GP5); else writePinHigh(GP5); break;
-        case 2: if (on) writePinLow(GP4); else writePinHigh(GP4); break;
+        case 1:  if (on) writePinLow(GP5); else writePinHigh(GP5); break;
+        case 2:  if (on) writePinLow(GP4); else writePinHigh(GP4); break;
         case 3:  sr_set_bit(0, on); break; // QA
         case 4:  sr_set_bit(1, on); break; // QB
         case 5:  sr_set_bit(2, on); break; // QC
@@ -190,8 +190,30 @@ void max7219_init(void) {
 }
 
 /* ─────────────────────────────────────────────
+ * Startup animation (no loop)
+ * ─────────────────────────────────────────────
+ * Bar:  seg 1..10 then 9..1 (19 steps) @ 111ms
+ * Max:  show 3, then add 2, then add 1, then add 0
+ *       (4 stages) timed to finish at same time as bar
+ * End:  BOTH OFF, MODE_DEFAULT
+ */
+
+#define START_BAR_STEP_MS   111u
+#define START_BAR_STEPS     19u
+#define START_TOTAL_MS      (START_BAR_STEP_MS * START_BAR_STEPS) // 2109ms
+
+// 4 stages spread across START_TOTAL_MS
+// Boundaries: [0..b0) stage0, [b0..b1) stage1, [b1..b2) stage2, [b2..b3) stage3, >=b3 done
+#define START_STAGE0_END    (START_TOTAL_MS / 4u)               // 527
+#define START_STAGE1_END    (2u * (START_TOTAL_MS / 4u))        // 1054
+#define START_STAGE2_END    (3u * (START_TOTAL_MS / 4u))        // 1581
+#define START_STAGE3_END    (START_TOTAL_MS)                    // 2109
+
+static bool     g_startup_running = false;
+static uint32_t g_startup_t0      = 0;
+
+/* ─────────────────────────────────────────────
  * Mode switching helper
- * (No brightness changes here—config.h only)
  * ───────────────────────────────────────────── */
 static inline void set_display_mode(display_mode_t mode) {
     g_mode = mode;
@@ -220,22 +242,106 @@ void keyboard_pre_init_user(void) {
 }
 
 void keyboard_post_init_user(void) {
-    // Hardening: make sure CS is a driven output and stays HIGH when idle
+    // Ensure CS is a driven output and stays HIGH when idle
     setPinOutput(MAX7219_CS_PIN);
     writePinHigh(MAX7219_CS_PIN);
 
     max7219_init();
 
-    set_display_mode(MODE_DEFAULT); // ensure both displays OFF at boot
+    // Start the fun startup animation
+    g_startup_running = true;
+    g_startup_t0 = timer_read32();
+
+    // Begin from a known state
+    segments_all_off();
+    max7219_blank_all();
+    max7219_force_on(); // make sure we're not in shutdown/test
+
+    // After animation ends we will go to MODE_DEFAULT (off)
+    g_mode = MODE_DEFAULT;
 }
 
 /* ─────────────────────────────────────────────
- * TEST MODE: bar display
- * Pass A: one ON at a time (1..10)
- * Pass B: all ON except one (1..10)
- * Loop A↔B
+ * Startup animation: BAR (runs in housekeeping)
  * ───────────────────────────────────────────── */
+static void startup_bar_task(void) {
+    uint32_t now = timer_read32();
+    uint32_t elapsed = TIMER_DIFF_32(now, g_startup_t0);
+
+    if (elapsed >= START_TOTAL_MS) {
+        // Done
+        segments_all_off();
+        return;
+    }
+
+    uint32_t step = elapsed / START_BAR_STEP_MS; // 0..18
+    if (step >= START_BAR_STEPS) step = START_BAR_STEPS - 1;
+
+    // Map step to segment: 0..9 => 1..10, 10..18 => 9..1
+    uint8_t seg;
+    if (step <= 9) {
+        seg = (uint8_t)(1u + step);
+    } else {
+        seg = (uint8_t)(19u - step); // step=10->9, ... step=18->1
+    }
+
+    segments_all_off();
+    segment_set(seg, true);
+}
+
+/* ─────────────────────────────────────────────
+ * Startup animation: MAX7219 (runs in matrix_scan)
+ * ───────────────────────────────────────────── */
+static void startup_max_task(void) {
+    uint32_t now = timer_read32();
+    uint32_t elapsed = TIMER_DIFF_32(now, g_startup_t0);
+
+    if (elapsed >= START_TOTAL_MS) {
+        // Done
+        max7219_blank_all();
+        return;
+    }
+
+    // Keep it alive in case it got knocked into shutdown/test
+    max7219_force_on();
+
+    // Decide stage
+    uint8_t stage = 0;
+    if (elapsed < START_STAGE0_END) stage = 0;
+    else if (elapsed < START_STAGE1_END) stage = 1;
+    else if (elapsed < START_STAGE2_END) stage = 2;
+    else stage = 3;
+
+    // Render: digit 0 shows 3, then add digit1=2, digit2=1, digit3=0
+    // (All others blank)
+    uint8_t out[4] = {0x0F, 0x0F, 0x0F, 0x0F};
+
+    out[0] = 3;
+    if (stage >= 1) out[1] = 2;
+    if (stage >= 2) out[2] = 1;
+    if (stage >= 3) out[3] = 0;
+
+    for (uint8_t d = 0; d < MAX7219_NUM_DIGITS && d < 4; d++) {
+        max7219_write_digit(d, out[d]);
+    }
+}
+
+/* ─────────────────────────────────────────────
+ * Tasks
+ * ───────────────────────────────────────────── */
+
+// Bar task + test mode bar behavior
 void housekeeping_task_user(void) {
+    // Startup animation takes priority and does NOT loop
+    if (g_startup_running) {
+        startup_bar_task();
+        return;
+    }
+
+    // TEST MODE: bar display
+    // Pass A: one ON at a time (1..10)
+    // Pass B: all ON except one (1..10)
+    // Loop A↔B
     if (g_mode != MODE_TEST) return;
 
     static uint32_t last_step = 0;
@@ -260,11 +366,26 @@ void housekeeping_task_user(void) {
     }
 }
 
-/* ─────────────────────────────────────────────
- * TEST MODE: MAX7219 pattern
- * + when the full loop finishes, force display back ON
- * ───────────────────────────────────────────── */
+// MAX7219 startup + test mode max behavior
 void matrix_scan_user(void) {
+    // Startup animation takes priority and does NOT loop
+    if (g_startup_running) {
+        startup_max_task();
+
+        // End the startup exactly when the shared duration elapses
+        uint32_t now = timer_read32();
+        uint32_t elapsed = TIMER_DIFF_32(now, g_startup_t0);
+        if (elapsed >= START_TOTAL_MS) {
+            // Stop both at the same time, then go to default OFF state
+            g_startup_running = false;
+            segments_all_off();
+            max7219_blank_all();
+            set_display_mode(MODE_DEFAULT);
+        }
+        return;
+    }
+
+    // TEST MODE: MAX7219 pattern (force-on at start of each tick)
     if (g_mode != MODE_TEST) return;
 
     #define MAX7219_STEP_MS 200
@@ -277,31 +398,25 @@ void matrix_scan_user(void) {
     if (TIMER_DIFF_32(now, last) < MAX7219_STEP_MS) return;
     last = now;
 
-    // Compute desired digit outputs; write all digits every tick.
+    max7219_force_on();
+
     uint8_t out[4] = {0x0F, 0x0F, 0x0F, 0x0F};
 
     if (phase < 4) {
         if (phase < MAX7219_NUM_DIGITS) out[phase] = val;
     } else {
-        for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) out[d] = val;
+        for (uint8_t d = 0; d < MAX7219_NUM_DIGITS && d < 4; d++) out[d] = val;
     }
 
-    for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) {
+    for (uint8_t d = 0; d < MAX7219_NUM_DIGITS && d < 4; d++) {
         max7219_write_digit(d, out[d]);
     }
 
-    // Advance state machine
     val++;
     if (val > 9) {
         val = 0;
         phase++;
-        if (phase > 4) {
-            // Completed the full loop (0..4). Wrap back to 0 and "force on".
-            phase = 0;
-
-            // Force display back ON (normal op + test off)
-            max7219_force_on();
-        }
+        if (phase > 4) phase = 0;
     }
 }
 
@@ -313,6 +428,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
     switch (keycode) {
         case LEDT:
+            // If startup is running, ignore toggles (optional, but avoids weird overlaps)
+            if (g_startup_running) return false;
+
             // Toggle between DEFAULT (all off) and TEST mode
             if (g_mode == MODE_TEST) set_display_mode(MODE_DEFAULT);
             else                    set_display_mode(MODE_TEST);
