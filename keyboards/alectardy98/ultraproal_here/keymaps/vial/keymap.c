@@ -53,56 +53,118 @@ static void bar_led_write(uint8_t bits) {
 }
 
 /* ─────────────────────────────────────────────
+ * Segment labeling + modes (ACTIVE-LOW)
+ * ───────────────────────────────────────────── */
+
+// 10-segment mapping (ACTIVE-LOW)
+//
+// Seg 1  -> GP5         (direct GPIO)  ON=LOW
+// Seg 2  -> GP4         (direct GPIO)  ON=LOW
+// Seg 3  -> 74HC595 QA  (bit 0)        ON=0
+// Seg 4  -> 74HC595 QB  (bit 1)        ON=0
+// Seg 5  -> 74HC595 QC  (bit 2)        ON=0
+// Seg 6  -> 74HC595 QD  (bit 3)        ON=0
+// Seg 7  -> 74HC595 QE  (bit 4)        ON=0
+// Seg 8  -> 74HC595 QF  (bit 5)        ON=0
+// Seg 9  -> 74HC595 QG  (bit 6)        ON=0
+// Seg 10 -> 74HC595 QH  (bit 7)        ON=0
+
+// ACTIVE-LOW state: 1 = OFF, 0 = ON
+static uint8_t sr_state = 0xFF; // QA..QH all OFF at boot
+
+static inline void sr_commit(void) {
+    bar_led_write(sr_state);
+}
+
+// ACTIVE-LOW bit control
+static inline void sr_set_bit(uint8_t bit, bool on) {
+    if (on) sr_state &= ~(1u << bit);   // ON  -> 0
+    else    sr_state |=  (1u << bit);   // OFF -> 1
+    sr_commit();
+}
+
+static inline void segments_all_off(void) {
+    // ACTIVE-LOW: HIGH = OFF
+    writePinHigh(GP5); // seg 1 OFF
+    writePinHigh(GP4); // seg 2 OFF
+    sr_state = 0xFF;   // SR outputs OFF
+    sr_commit();
+}
+
+static inline void segment_set(uint8_t seg, bool on) {
+    switch (seg) {
+        case 1:
+            if (on) writePinLow(GP5); else writePinHigh(GP5);
+            break;
+        case 2:
+            if (on) writePinLow(GP4); else writePinHigh(GP4);
+            break;
+
+        // seg 3..10 => QA..QH => bits 0..7 (ACTIVE-LOW)
+        case 3:  sr_set_bit(0, on); break; // QA
+        case 4:  sr_set_bit(1, on); break; // QB
+        case 5:  sr_set_bit(2, on); break; // QC
+        case 6:  sr_set_bit(3, on); break; // QD
+        case 7:  sr_set_bit(4, on); break; // QE
+        case 8:  sr_set_bit(5, on); break; // QF
+        case 9:  sr_set_bit(6, on); break; // QG
+        case 10: sr_set_bit(7, on); break; // QH
+        default: break;
+    }
+}
+
+typedef enum {
+    MODE_TEST = 0,
+} display_mode_t;
+
+static display_mode_t g_mode = MODE_TEST;
+
+/* ─────────────────────────────────────────────
  * Init once at boot
  * ───────────────────────────────────────────── */
 void keyboard_pre_init_user(void) {
+    // Force test mode at startup for now
+    g_mode = MODE_TEST;
+
     // Shift register pins
     setPinOutput(BAR_SER_PIN);
     setPinOutput(BAR_SRCLK_PIN);
     setPinOutput(BAR_RCLK_PIN);
 
-    // GP4 / GP5
-    setPinOutput(GP4);
-    setPinOutput(GP5);
+    // Direct segment pins (active-low)
+    setPinOutput(GP4); // seg 2
+    setPinOutput(GP5); // seg 1
 
-    // Known startup state: everything LOW
-    writePinLow(GP4);
-    writePinLow(GP5);
-    bar_led_write(0x00);
+    // Known startup state: all OFF
+    segments_all_off();
 }
 
 /* ─────────────────────────────────────────────
  * ALWAYS RUNS
- * Toggle shift registers + GP4/GP5 together every 1 second
+ * Mode: TEST
+ * Flash each segment one at a time (1..10), ~3x faster, loop
  * ───────────────────────────────────────────── */
 void housekeeping_task_user(void) {
-    static bool started = false;
-    static uint32_t last_toggle;
-    static bool state = false;
+    static uint32_t last_step = 0;
+    static uint8_t seg = 1;
 
-    if (!started) {
-        started = true;
-        last_toggle = timer_read();
-        state = false;
-
-        writePinLow(GP4);
-        writePinLow(GP5);
-        bar_led_write(0x00);
+    // 3x faster than 1000ms -> ~333ms
+    if (timer_elapsed(last_step) < 333) {
+        return;
     }
+    last_step = timer_read();
 
-    if (timer_elapsed(last_toggle) >= 1000) {
-        last_toggle = timer_read();
-        state = !state;
+    switch (g_mode) {
+        case MODE_TEST:
+        default:
+            segments_all_off();        // all OFF (HIGH / 1)
+            segment_set(seg, true);    // one ON  (LOW  / 0)
 
-        if (state) {
-            writePinHigh(GP4);
-            writePinHigh(GP5);
-            bar_led_write(0xFF);
-        } else {
-            writePinLow(GP4);
-            writePinLow(GP5);
-            bar_led_write(0x00);
-        }
+            seg++;
+            if (seg > 10) {
+                seg = 1;
+            }
+            break;
     }
 }
 
