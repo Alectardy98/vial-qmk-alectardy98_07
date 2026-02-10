@@ -41,5 +41,5 @@
 // Chip Select (any free GPIO)
 #define MAX7219_CS_PIN GP8
 #define MAX7219_NUM_DIGITS 4   // If you truly need 9 digits, you’ll need a 2nd MAX7219.
-#define MAX7219_INTENSITY_DEFAULT 0x0F
+#define MAX7219_INTENSITY_DEFAULT 0x08 // full bright is 0x0f
 #define NO_USB_SUSPEND

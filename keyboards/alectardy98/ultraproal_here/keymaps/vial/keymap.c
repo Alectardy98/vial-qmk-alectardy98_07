@@ -31,11 +31,18 @@ enum _layer {
 };
 
 /* ─────────────────────────────────────────────
+ * Vial-style user macro keycodes + handler
+ * ───────────────────────────────────────────── */
+enum blender_keycode {
+    LEDT = QK_KB_0, // put this on a key in Vial
+};
+
+/* ─────────────────────────────────────────────
  * Display modes
  * ───────────────────────────────────────────── */
 typedef enum {
     MODE_DEFAULT = 0, // BOTH displays OFF
-    MODE_TEST    = 1, // Bar “one at a time” + MAX7219 pattern
+    MODE_TEST    = 1, // Bar + MAX7219 test patterns
 } display_mode_t;
 
 static display_mode_t g_mode = MODE_DEFAULT;
@@ -44,22 +51,17 @@ static display_mode_t g_mode = MODE_DEFAULT;
  * 74HC595 helpers
  * ───────────────────────────────────────────── */
 
-// Pulse a pin HIGH → LOW
 static inline void sr_pulse(pin_t pin) {
     writePinHigh(pin);
     writePinLow(pin);
 }
 
-// Send & latch one byte (MSB first) to the 74HC595
 static void bar_led_write(uint8_t bits) {
     writePinLow(BAR_RCLK_PIN);
 
     for (int8_t i = 7; i >= 0; i--) {
-        if (bits & (1 << i)) {
-            writePinHigh(BAR_SER_PIN);
-        } else {
-            writePinLow(BAR_SER_PIN);
-        }
+        if (bits & (1 << i)) writePinHigh(BAR_SER_PIN);
+        else                 writePinLow(BAR_SER_PIN);
         sr_pulse(BAR_SRCLK_PIN);
     }
 
@@ -86,7 +88,15 @@ static inline void sr_set_bit(uint8_t bit, bool on) {
 static inline void segments_all_off(void) {
     writePinHigh(GP5); // seg1 OFF
     writePinHigh(GP4); // seg2 OFF
-    sr_state = 0xFF;   // SR OFF
+    sr_state = 0xFF;
+    sr_commit();
+}
+
+// Turn all 10 segments ON (active-low)
+static inline void segments_all_on(void) {
+    writePinLow(GP5);  // seg1 ON
+    writePinLow(GP4);  // seg2 ON
+    sr_state = 0x00;   // QA..QH ON
     sr_commit();
 }
 
@@ -108,6 +118,8 @@ static inline void segment_set(uint8_t seg, bool on) {
 
 /* ─────────────────────────────────────────────
  * MAX7219 (SPI)
+ * Brightness is configured ONLY via config.h:
+ *   #define MAX7219_INTENSITY_DEFAULT 0x0F  (or 0x08 for ~half)
  * ───────────────────────────────────────────── */
 
 #ifndef MAX7219_CS_PIN
@@ -150,20 +162,22 @@ static inline void max7219_blank_all(void) {
 void max7219_init(void) {
     spi_init();
 
+    // Optional “all on” flash to prove wiring
     max7219_tx(REG_TEST, 0x01);
     wait_ms(150);
     max7219_tx(REG_TEST, 0x00);
 
+    // Normal operation
     max7219_tx(REG_SHUTDOWN, 0x01);
 
-    // scan limit
+    // Scan only the digits you physically have
     max7219_tx(REG_SCANLIM, (uint8_t)(MAX7219_NUM_DIGITS - 1));
 
-    // decode mask for physical digits
+    // Code-B decode enabled only for the digits you have
     uint8_t decode_mask = (MAX7219_NUM_DIGITS >= 8) ? 0xFF : (uint8_t)((1u << MAX7219_NUM_DIGITS) - 1u);
     max7219_tx(REG_DECODE, decode_mask);
 
-    // intensity
+    // Brightness is set once here from config.h
     max7219_tx(REG_INTENSITY, (MAX7219_INTENSITY_DEFAULT & 0x0F));
 
     max7219_blank_all();
@@ -171,6 +185,7 @@ void max7219_init(void) {
 
 /* ─────────────────────────────────────────────
  * Mode switching helper
+ * (No brightness changes here—config.h only)
  * ───────────────────────────────────────────── */
 static inline void set_display_mode(display_mode_t mode) {
     g_mode = mode;
@@ -179,7 +194,6 @@ static inline void set_display_mode(display_mode_t mode) {
         segments_all_off();
         max7219_blank_all();
     }
-    // MODE_TEST initializes itself via the tasks’ static state
 }
 
 /* ─────────────────────────────────────────────
@@ -201,37 +215,50 @@ void keyboard_pre_init_user(void) {
 
 void keyboard_post_init_user(void) {
     max7219_init();
+
+    // Hardening: make sure CS is a driven output and stays HIGH when idle
+    setPinOutput(MAX7219_CS_PIN);
+    writePinHigh(MAX7219_CS_PIN);
+
     set_display_mode(MODE_DEFAULT); // ensure both displays OFF at boot
 }
 
 /* ─────────────────────────────────────────────
- * TEST MODE: bar display (1 segment at a time)
+ * TEST MODE: bar display
+ * Pass A: one ON at a time (1..10)
+ * Pass B: all ON except one (1..10)
+ * Loop A↔B
  * ───────────────────────────────────────────── */
 void housekeeping_task_user(void) {
-    if (g_mode != MODE_TEST) {
-        return;
-    }
+    if (g_mode != MODE_TEST) return;
 
     static uint32_t last_step = 0;
     static uint8_t seg = 1;
+    static bool invert_pass = false; // false=single-on, true=all-but-one
 
     if (timer_elapsed(last_step) < 333) return;
     last_step = timer_read();
 
-    segments_all_off();
-    segment_set(seg, true);
+    if (!invert_pass) {
+        segments_all_off();
+        segment_set(seg, true);
+    } else {
+        segments_all_on();
+        segment_set(seg, false);
+    }
 
     seg++;
-    if (seg > 10) seg = 1;
+    if (seg > 10) {
+        seg = 1;
+        invert_pass = !invert_pass;
+    }
 }
 
 /* ─────────────────────────────────────────────
- * TEST MODE: MAX7219 pattern you requested
+ * TEST MODE: MAX7219 pattern (hardened)
  * ───────────────────────────────────────────── */
 void matrix_scan_user(void) {
-    if (g_mode != MODE_TEST) {
-        return;
-    }
+    if (g_mode != MODE_TEST) return;
 
     #define MAX7219_STEP_MS 200
 
@@ -243,17 +270,17 @@ void matrix_scan_user(void) {
     if (TIMER_DIFF_32(now, last) < MAX7219_STEP_MS) return;
     last = now;
 
-    // Blank all digits first
-    max7219_blank_all();
+    // Compute desired digit outputs; write all digits every tick.
+    uint8_t out[4] = {0x0F, 0x0F, 0x0F, 0x0F};
 
     if (phase < 4) {
-        if (phase < MAX7219_NUM_DIGITS) {
-            max7219_write_digit(phase, val);
-        }
+        if (phase < MAX7219_NUM_DIGITS) out[phase] = val;
     } else {
-        for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) {
-            max7219_write_digit(d, val);
-        }
+        for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) out[d] = val;
+    }
+
+    for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) {
+        max7219_write_digit(d, out[d]);
     }
 
     val++;
@@ -265,25 +292,16 @@ void matrix_scan_user(void) {
 }
 
 /* ─────────────────────────────────────────────
- * Vial-style user macro keycodes + handler
+ * Macro handler
  * ───────────────────────────────────────────── */
-
-// Defines the keycodes used by our macros in process_record_user
-enum blender_keycode {
-    LEDT = QK_KB_0,   // put this on a key in Vial
-};
-
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (!record->event.pressed) return true;
 
     switch (keycode) {
         case LEDT:
             // Toggle between DEFAULT (all off) and TEST mode
-            if (g_mode == MODE_TEST) {
-                set_display_mode(MODE_DEFAULT);
-            } else {
-                set_display_mode(MODE_TEST);
-            }
+            if (g_mode == MODE_TEST) set_display_mode(MODE_DEFAULT);
+            else                    set_display_mode(MODE_TEST);
             return false;
     }
     return true;
