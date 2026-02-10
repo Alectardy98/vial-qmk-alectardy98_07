@@ -18,10 +18,27 @@
 #include "timer.h"
 #include "config.h"
 
+// MAX7219 SPI
+#include "quantum.h"
+#include "spi_master.h"
+
+/* ─────────────────────────────────────────────
+ * Layers
+ * ───────────────────────────────────────────── */
 enum _layer {
     _BASE,
     _FN
 };
+
+/* ─────────────────────────────────────────────
+ * Display modes
+ * ───────────────────────────────────────────── */
+typedef enum {
+    MODE_DEFAULT = 0, // BOTH displays OFF
+    MODE_TEST    = 1, // Bar “one at a time” + MAX7219 pattern
+} display_mode_t;
+
+static display_mode_t g_mode = MODE_DEFAULT;
 
 /* ─────────────────────────────────────────────
  * 74HC595 helpers
@@ -35,10 +52,8 @@ static inline void sr_pulse(pin_t pin) {
 
 // Send & latch one byte (MSB first) to the 74HC595
 static void bar_led_write(uint8_t bits) {
-    // Hold latch low while shifting
     writePinLow(BAR_RCLK_PIN);
 
-    // Shift out 8 bits, MSB first
     for (int8_t i = 7; i >= 0; i--) {
         if (bits & (1 << i)) {
             writePinHigh(BAR_SER_PIN);
@@ -48,35 +63,20 @@ static void bar_led_write(uint8_t bits) {
         sr_pulse(BAR_SRCLK_PIN);
     }
 
-    // Latch outputs
     sr_pulse(BAR_RCLK_PIN);
 }
 
 /* ─────────────────────────────────────────────
- * Segment labeling + modes (ACTIVE-LOW)
+ * Bar segments (ACTIVE-LOW)
  * ───────────────────────────────────────────── */
 
-// 10-segment mapping (ACTIVE-LOW)
-//
-// Seg 1  -> GP5         (direct GPIO)  ON=LOW
-// Seg 2  -> GP4         (direct GPIO)  ON=LOW
-// Seg 3  -> 74HC595 QA  (bit 0)        ON=0
-// Seg 4  -> 74HC595 QB  (bit 1)        ON=0
-// Seg 5  -> 74HC595 QC  (bit 2)        ON=0
-// Seg 6  -> 74HC595 QD  (bit 3)        ON=0
-// Seg 7  -> 74HC595 QE  (bit 4)        ON=0
-// Seg 8  -> 74HC595 QF  (bit 5)        ON=0
-// Seg 9  -> 74HC595 QG  (bit 6)        ON=0
-// Seg 10 -> 74HC595 QH  (bit 7)        ON=0
+// Seg 1  -> GP5 (ON=LOW)
+// Seg 2  -> GP4 (ON=LOW)
+// Seg 3..10 -> 74HC595 QA..QH (bit0..bit7), ON=0
+static uint8_t sr_state = 0xFF; // 1=OFF, 0=ON
 
-// ACTIVE-LOW state: 1 = OFF, 0 = ON
-static uint8_t sr_state = 0xFF; // QA..QH all OFF at boot
+static inline void sr_commit(void) { bar_led_write(sr_state); }
 
-static inline void sr_commit(void) {
-    bar_led_write(sr_state);
-}
-
-// ACTIVE-LOW bit control
 static inline void sr_set_bit(uint8_t bit, bool on) {
     if (on) sr_state &= ~(1u << bit);   // ON  -> 0
     else    sr_state |=  (1u << bit);   // OFF -> 1
@@ -84,23 +84,16 @@ static inline void sr_set_bit(uint8_t bit, bool on) {
 }
 
 static inline void segments_all_off(void) {
-    // ACTIVE-LOW: HIGH = OFF
-    writePinHigh(GP5); // seg 1 OFF
-    writePinHigh(GP4); // seg 2 OFF
-    sr_state = 0xFF;   // SR outputs OFF
+    writePinHigh(GP5); // seg1 OFF
+    writePinHigh(GP4); // seg2 OFF
+    sr_state = 0xFF;   // SR OFF
     sr_commit();
 }
 
 static inline void segment_set(uint8_t seg, bool on) {
     switch (seg) {
-        case 1:
-            if (on) writePinLow(GP5); else writePinHigh(GP5);
-            break;
-        case 2:
-            if (on) writePinLow(GP4); else writePinHigh(GP4);
-            break;
-
-        // seg 3..10 => QA..QH => bits 0..7 (ACTIVE-LOW)
+        case 1: if (on) writePinLow(GP5); else writePinHigh(GP5); break;
+        case 2: if (on) writePinLow(GP4); else writePinHigh(GP4); break;
         case 3:  sr_set_bit(0, on); break; // QA
         case 4:  sr_set_bit(1, on); break; // QB
         case 5:  sr_set_bit(2, on); break; // QC
@@ -113,19 +106,86 @@ static inline void segment_set(uint8_t seg, bool on) {
     }
 }
 
-typedef enum {
-    MODE_TEST = 0,
-} display_mode_t;
+/* ─────────────────────────────────────────────
+ * MAX7219 (SPI)
+ * ───────────────────────────────────────────── */
 
-static display_mode_t g_mode = MODE_TEST;
+#ifndef MAX7219_CS_PIN
+#    define MAX7219_CS_PIN GP8
+#endif
+
+#ifndef MAX7219_NUM_DIGITS
+#    define MAX7219_NUM_DIGITS 4
+#endif
+
+#ifndef MAX7219_INTENSITY_DEFAULT
+#    define MAX7219_INTENSITY_DEFAULT 0x0F
+#endif
+
+#define REG_DIGIT0    0x01
+#define REG_DECODE    0x09
+#define REG_INTENSITY 0x0A
+#define REG_SCANLIM   0x0B
+#define REG_SHUTDOWN  0x0C
+#define REG_TEST      0x0F
+
+static inline void max7219_tx(uint8_t reg, uint8_t data) {
+    spi_start(MAX7219_CS_PIN, /*lsb_first=*/false, /*mode=*/0, /*divisor=*/128);
+    spi_write(reg);
+    spi_write(data);
+    spi_stop();
+}
+
+static inline void max7219_write_digit(uint8_t digit, uint8_t val) {
+    if (digit >= MAX7219_NUM_DIGITS) return;
+    max7219_tx((uint8_t)(REG_DIGIT0 + digit), val);
+}
+
+static inline void max7219_blank_all(void) {
+    for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) {
+        max7219_write_digit(d, 0x0F); // blank in Code-B decode
+    }
+}
+
+void max7219_init(void) {
+    spi_init();
+
+    max7219_tx(REG_TEST, 0x01);
+    wait_ms(150);
+    max7219_tx(REG_TEST, 0x00);
+
+    max7219_tx(REG_SHUTDOWN, 0x01);
+
+    // scan limit
+    max7219_tx(REG_SCANLIM, (uint8_t)(MAX7219_NUM_DIGITS - 1));
+
+    // decode mask for physical digits
+    uint8_t decode_mask = (MAX7219_NUM_DIGITS >= 8) ? 0xFF : (uint8_t)((1u << MAX7219_NUM_DIGITS) - 1u);
+    max7219_tx(REG_DECODE, decode_mask);
+
+    // intensity
+    max7219_tx(REG_INTENSITY, (MAX7219_INTENSITY_DEFAULT & 0x0F));
+
+    max7219_blank_all();
+}
 
 /* ─────────────────────────────────────────────
- * Init once at boot
+ * Mode switching helper
+ * ───────────────────────────────────────────── */
+static inline void set_display_mode(display_mode_t mode) {
+    g_mode = mode;
+
+    if (g_mode == MODE_DEFAULT) {
+        segments_all_off();
+        max7219_blank_all();
+    }
+    // MODE_TEST initializes itself via the tasks’ static state
+}
+
+/* ─────────────────────────────────────────────
+ * Init hooks
  * ───────────────────────────────────────────── */
 void keyboard_pre_init_user(void) {
-    // Force test mode at startup for now
-    g_mode = MODE_TEST;
-
     // Shift register pins
     setPinOutput(BAR_SER_PIN);
     setPinOutput(BAR_SRCLK_PIN);
@@ -135,37 +195,98 @@ void keyboard_pre_init_user(void) {
     setPinOutput(GP4); // seg 2
     setPinOutput(GP5); // seg 1
 
-    // Known startup state: all OFF
     segments_all_off();
+    g_mode = MODE_DEFAULT;
+}
+
+void keyboard_post_init_user(void) {
+    max7219_init();
+    set_display_mode(MODE_DEFAULT); // ensure both displays OFF at boot
 }
 
 /* ─────────────────────────────────────────────
- * ALWAYS RUNS
- * Mode: TEST
- * Flash each segment one at a time (1..10), ~3x faster, loop
+ * TEST MODE: bar display (1 segment at a time)
  * ───────────────────────────────────────────── */
 void housekeeping_task_user(void) {
+    if (g_mode != MODE_TEST) {
+        return;
+    }
+
     static uint32_t last_step = 0;
     static uint8_t seg = 1;
 
-    // 3x faster than 1000ms -> ~333ms
-    if (timer_elapsed(last_step) < 333) {
-        return;
-    }
+    if (timer_elapsed(last_step) < 333) return;
     last_step = timer_read();
 
-    switch (g_mode) {
-        case MODE_TEST:
-        default:
-            segments_all_off();        // all OFF (HIGH / 1)
-            segment_set(seg, true);    // one ON  (LOW  / 0)
+    segments_all_off();
+    segment_set(seg, true);
 
-            seg++;
-            if (seg > 10) {
-                seg = 1;
-            }
-            break;
+    seg++;
+    if (seg > 10) seg = 1;
+}
+
+/* ─────────────────────────────────────────────
+ * TEST MODE: MAX7219 pattern you requested
+ * ───────────────────────────────────────────── */
+void matrix_scan_user(void) {
+    if (g_mode != MODE_TEST) {
+        return;
     }
+
+    #define MAX7219_STEP_MS 200
+
+    static uint32_t last = 0;
+    static uint8_t phase = 0; // 0..3 single digit, 4 all digits
+    static uint8_t val = 0;   // 0..9
+
+    uint32_t now = timer_read32();
+    if (TIMER_DIFF_32(now, last) < MAX7219_STEP_MS) return;
+    last = now;
+
+    // Blank all digits first
+    max7219_blank_all();
+
+    if (phase < 4) {
+        if (phase < MAX7219_NUM_DIGITS) {
+            max7219_write_digit(phase, val);
+        }
+    } else {
+        for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) {
+            max7219_write_digit(d, val);
+        }
+    }
+
+    val++;
+    if (val > 9) {
+        val = 0;
+        phase++;
+        if (phase > 4) phase = 0;
+    }
+}
+
+/* ─────────────────────────────────────────────
+ * Vial-style user macro keycodes + handler
+ * ───────────────────────────────────────────── */
+
+// Defines the keycodes used by our macros in process_record_user
+enum blender_keycode {
+    LEDT = QK_KB_0,   // put this on a key in Vial
+};
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (!record->event.pressed) return true;
+
+    switch (keycode) {
+        case LEDT:
+            // Toggle between DEFAULT (all off) and TEST mode
+            if (g_mode == MODE_TEST) {
+                set_display_mode(MODE_DEFAULT);
+            } else {
+                set_display_mode(MODE_TEST);
+            }
+            return false;
+    }
+    return true;
 }
 
 /* ─────────────────────────────────────────────
@@ -178,7 +299,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
     _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
     _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
-                                                                   _______),
+                                                                   LEDT),
 
 [_FN] = LAYOUT(
     _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
