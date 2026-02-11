@@ -39,7 +39,12 @@ enum _layer {
 enum custom_keycode {
     LEDT = QK_KB_0, // toggle DEFAULT <-> TEST
     CWMD,           // toggle DEFAULT <-> CW
-    WPMT,           // enter/commit WPM edit (CW mode only)
+    WPMT,           // enter WPM edit (CW mode only)
+
+    // tone controls (CW mode)
+    TONE,           // MOMENTARY: hold = tone on, release = off (uses CW pitch)
+    TNUP,           // pitch up
+    TNDN,           // pitch down
 };
 
 /* ─────────────────────────────────────────────
@@ -56,7 +61,6 @@ static display_mode_t g_mode = MODE_DEFAULT;
 /* ─────────────────────────────────────────────
  * 74HC595 helpers
  * ───────────────────────────────────────────── */
-
 static inline void sr_pulse(pin_t pin) {
     writePinHigh(pin);
     writePinLow(pin);
@@ -77,7 +81,6 @@ static void bar_led_write(uint8_t bits) {
 /* ─────────────────────────────────────────────
  * Bar segments (ACTIVE-LOW)
  * ───────────────────────────────────────────── */
-
 // Seg 1  -> GP5 (ON=LOW)
 // Seg 2  -> GP4 (ON=LOW)
 // Seg 3..10 -> 74HC595 QA..QH (bit0..bit7), ON=0
@@ -98,7 +101,6 @@ static inline void segments_all_off(void) {
     sr_commit();
 }
 
-// Turn all 10 segments ON (active-low)
 static inline void segments_all_on(void) {
     writePinLow(GP5);  // seg1 ON
     writePinLow(GP4);  // seg2 ON
@@ -124,10 +126,7 @@ static inline void segment_set(uint8_t seg, bool on) {
 
 /* ─────────────────────────────────────────────
  * MAX7219 (SPI)
- * Brightness is configured ONLY via config.h:
- *   #define MAX7219_INTENSITY_DEFAULT 0x0F  (or 0x08 for ~half)
  * ───────────────────────────────────────────── */
-
 #ifndef MAX7219_CS_PIN
 #    define MAX7219_CS_PIN GP8
 #endif
@@ -165,7 +164,6 @@ static inline void max7219_blank_all(void) {
     }
 }
 
-// Force "display on" state (normal operation + test off)
 static inline void max7219_force_on(void) {
     max7219_tx(REG_SHUTDOWN, 0x01);
     max7219_tx(REG_TEST, 0x00);
@@ -174,24 +172,17 @@ static inline void max7219_force_on(void) {
 void max7219_init(void) {
     spi_init();
 
-    // Optional “all on” flash to prove wiring
     max7219_tx(REG_TEST, 0x01);
     wait_ms(150);
     max7219_tx(REG_TEST, 0x00);
 
-    // Normal operation
     max7219_tx(REG_SHUTDOWN, 0x01);
-
-    // Scan only the digits you physically have
     max7219_tx(REG_SCANLIM, (uint8_t)(MAX7219_NUM_DIGITS - 1));
 
-    // Code-B decode enabled only for the digits you have
     uint8_t decode_mask = (MAX7219_NUM_DIGITS >= 8) ? 0xFF : (uint8_t)((1u << MAX7219_NUM_DIGITS) - 1u);
     max7219_tx(REG_DECODE, decode_mask);
 
-    // Brightness is set once here from config.h
     max7219_tx(REG_INTENSITY, (MAX7219_INTENSITY_DEFAULT & 0x0F));
-
     max7219_blank_all();
 }
 
@@ -199,11 +190,15 @@ void max7219_init(void) {
  * CW Audio + WPM + Morse scheduler
  * ───────────────────────────────────────────── */
 
-static uint16_t cw_wpm = 20;
+#ifndef CW_DEFAULT_WPM
+#    define CW_DEFAULT_WPM 33u
+#endif
+
+static uint16_t cw_wpm = CW_DEFAULT_WPM;
 
 // WPM entry state (CW mode only)
 static bool     cw_edit_active = false;
-static char     cw_edit_buf[4] = {0}; // up to "99" + NUL
+static char     cw_edit_buf[4] = {0}; // we only use 2 digits now, but keep room
 static uint8_t  cw_edit_len    = 0;
 
 static inline uint16_t cw_dit_ms(void) {
@@ -211,13 +206,9 @@ static inline uint16_t cw_dit_ms(void) {
     return (uint16_t)(1200u / cw_wpm);
 }
 
-// Dot weighting to avoid "too-short dot" glitches at high WPM
-#ifndef CW_DOT_EXTRA_MS
-#    define CW_DOT_EXTRA_MS 12u  // was 8u; make dots a bit longer
-#endif
-
+// Dot insurance (audio gate only) WITHOUT breaking true WPM
 #ifndef CW_DOT_MIN_MS
-#    define CW_DOT_MIN_MS   30u  // was 28u; slightly longer minimum dot
+#    define CW_DOT_MIN_MS 30u
 #endif
 
 // IMPORTANT: In QMK, KC_0 is NOT between KC_1 and KC_9.
@@ -233,6 +224,24 @@ static inline char digit_from_kc(uint16_t kc) {
  * ───────────────────────────────────────────── */
 static float cw_tone_hz = 600.0f;
 static bool  cw_tone_running = false;
+
+static bool  cw_tone_preview = false;
+
+#ifndef CW_TONE_STEP_HZ
+#    define CW_TONE_STEP_HZ 20.0f
+#endif
+#ifndef CW_TONE_MIN_HZ
+#    define CW_TONE_MIN_HZ  200.0f
+#endif
+#ifndef CW_TONE_MAX_HZ
+#    define CW_TONE_MAX_HZ  2000.0f
+#endif
+
+static inline float clampf(float x, float lo, float hi) {
+    if (x < lo) return lo;
+    if (x > hi) return hi;
+    return x;
+}
 
 static inline void cw_tone_engine_start(void) {
     if (!is_audio_on()) return;
@@ -250,6 +259,13 @@ static inline void cw_tone_on(void)  { cw_tone_engine_start(); }
 static inline void cw_tone_off(void) { cw_tone_engine_stop();  }
 
 static inline void cw_audio_hard_stop(void) { cw_tone_engine_stop(); }
+
+static inline void cw_tone_restart_if_running(void) {
+    if (!cw_tone_running) return;
+    stop_all_notes();
+    cw_tone_running = false;
+    cw_tone_engine_start();
+}
 
 /* ─────────────────────────────────────────────
  * Morse table
@@ -309,19 +325,16 @@ static void cw_display_wpm(uint16_t wpm) {
     uint8_t tens = (uint8_t)(wpm / 10u);
     uint8_t ones = (uint8_t)(wpm % 10u);
 
-    // Blank 0..1
     max7219_write_digit(0, 0x0F);
     max7219_write_digit(1, 0x0F);
 
-    // Show WPM on 2..3
     if (MAX7219_NUM_DIGITS > 2) max7219_write_digit(2, tens);
     if (MAX7219_NUM_DIGITS > 3) max7219_write_digit(3, ones);
 }
 
 /* ─────────────────────────────────────────────
- * Type-ahead queue (~500 chars) + time-remaining bargraph
+ * Type-ahead queue + bargraph
  * ───────────────────────────────────────────── */
-
 typedef enum {
     CW_IDLE = 0,
     CW_TONE_ON,
@@ -391,9 +404,7 @@ static inline uint32_t cw_estimate_queue_ms(void) {
     return cw_queue_dits_total * (uint32_t)cw_dit_ms();
 }
 
-/* ─────────────────────────────────────────────
- * Queue overflow lockout + error feedback (CW mode only)
- * ───────────────────────────────────────────── */
+/* overflow lockout */
 static bool     cw_queue_locked = false;
 static uint32_t cw_err_flash_until = 0;
 
@@ -411,9 +422,7 @@ static inline void cw_error_beep_and_flash(void) {
     stop_all_notes();
 }
 
-/* ─────────────────────────────────────────────
- * Bargraph update throttling
- * ───────────────────────────────────────────── */
+/* bargraph update throttling */
 #ifndef CW_BAR_UPDATE_MS
 #    define CW_BAR_UPDATE_MS 40u
 #endif
@@ -470,6 +479,35 @@ static const char *cw_pat = NULL;
 static uint8_t cw_pat_idx = 0;
 static bool cw_intra_symbol_gap = false;
 
+// Dot-insurance accounting (preserve true WPM)
+static uint16_t cw_last_on_extra_ms = 0;
+static uint32_t cw_gap_debt_ms      = 0;
+
+static inline uint16_t cw_elem_base_ms(char sym) {
+    uint16_t dit = cw_dit_ms();
+    return (sym == '-') ? (uint16_t)(3u * dit) : dit;
+}
+
+static inline uint16_t cw_elem_play_ms(char sym, uint16_t *extra_out) {
+    uint16_t base = cw_elem_base_ms(sym);
+
+    if (sym == '.' && base < CW_DOT_MIN_MS) {
+        uint16_t extra = (uint16_t)(CW_DOT_MIN_MS - base);
+        *extra_out = extra;
+        return CW_DOT_MIN_MS;
+    }
+
+    *extra_out = 0;
+    return base;
+}
+
+static inline uint32_t cw_apply_gap_debt(uint32_t gap_ms) {
+    if (cw_gap_debt_ms == 0) return gap_ms;
+    uint32_t use = (cw_gap_debt_ms < gap_ms) ? cw_gap_debt_ms : gap_ms;
+    cw_gap_debt_ms -= use;
+    return gap_ms - use;
+}
+
 static void cw_start_next_char(void) {
     if (cw_q_empty()) {
         cw_state = CW_IDLE;
@@ -484,10 +522,13 @@ static void cw_start_next_char(void) {
     uint16_t d = cw_char_dits(c);
     cw_queue_dits_total = (cw_queue_dits_total >= d) ? (cw_queue_dits_total - d) : 0;
 
+    uint16_t dit = cw_dit_ms();
+
     if (c == ' ') {
         cw_state = CW_GAP;
         cw_tone_off();
-        cw_next_event_ms = timer_read32() + (uint32_t)(7u * cw_dit_ms());
+        uint32_t gap = cw_apply_gap_debt((uint32_t)(7u * dit));
+        cw_next_event_ms = timer_read32() + gap;
         return;
     }
 
@@ -495,7 +536,8 @@ static void cw_start_next_char(void) {
     if (!cw_pat) {
         cw_state = CW_GAP;
         cw_tone_off();
-        cw_next_event_ms = timer_read32() + (uint32_t)(3u * cw_dit_ms());
+        uint32_t gap = cw_apply_gap_debt((uint32_t)(3u * dit));
+        cw_next_event_ms = timer_read32() + gap;
         return;
     }
 
@@ -505,17 +547,8 @@ static void cw_start_next_char(void) {
     cw_state = CW_TONE_ON;
     cw_tone_on();
 
-    uint16_t dit = cw_dit_ms();
-    uint16_t dur;
-
-    if (cw_pat[cw_pat_idx] == '-') {
-        dur = (uint16_t)(3u * dit);
-    } else {
-        uint16_t dot = (uint16_t)(dit + CW_DOT_EXTRA_MS);
-        if (dot < CW_DOT_MIN_MS) dot = CW_DOT_MIN_MS;
-        dur = dot;
-    }
-
+    cw_last_on_extra_ms = 0;
+    uint16_t dur = cw_elem_play_ms(cw_pat[cw_pat_idx], &cw_last_on_extra_ms);
     cw_next_event_ms = timer_read32() + dur;
 }
 
@@ -529,12 +562,19 @@ static void cw_task(void) {
     if (!is_audio_on() && cw_tone_running) cw_audio_hard_stop();
 
     max7219_force_on();
+
+    // Show edit buffer while editing
     if (cw_edit_active) {
         uint16_t tmp = 0;
         for (uint8_t i = 0; i < cw_edit_len; i++) tmp = (uint16_t)(tmp * 10u + (uint16_t)(cw_edit_buf[i] - '0'));
         cw_display_wpm(tmp);
     } else {
         cw_display_wpm(cw_wpm);
+    }
+
+    if (cw_tone_preview) {
+        cw_tone_on();
+        return;
     }
 
     uint32_t now = timer_read32();
@@ -551,7 +591,13 @@ static void cw_task(void) {
     if (cw_state == CW_TONE_ON) {
         cw_tone_off();
         cw_state = CW_GAP;
-        cw_next_event_ms = now + dit;
+
+        cw_gap_debt_ms += (uint32_t)cw_last_on_extra_ms;
+        cw_last_on_extra_ms = 0;
+
+        uint32_t gap = cw_apply_gap_debt((uint32_t)dit);
+        cw_next_event_ms = now + gap;
+
         cw_intra_symbol_gap = true;
         return;
     }
@@ -564,22 +610,17 @@ static void cw_task(void) {
             cw_state = CW_TONE_ON;
             cw_tone_on();
 
-            uint16_t dur;
-            if (cw_pat[cw_pat_idx] == '-') {
-                dur = (uint16_t)(3u * dit);
-            } else {
-                uint16_t dot = (uint16_t)(dit + CW_DOT_EXTRA_MS);
-                if (dot < CW_DOT_MIN_MS) dot = CW_DOT_MIN_MS;
-                dur = dot;
-            }
-
+            cw_last_on_extra_ms = 0;
+            uint16_t dur = cw_elem_play_ms(cw_pat[cw_pat_idx], &cw_last_on_extra_ms);
             cw_next_event_ms = now + dur;
             return;
         }
 
         cw_pat = NULL;
         cw_state = CW_GAP;
-        cw_next_event_ms = now + (uint32_t)(2u * dit);
+
+        uint32_t gap = cw_apply_gap_debt((uint32_t)(2u * dit));
+        cw_next_event_ms = now + gap;
         return;
     }
 
@@ -587,10 +628,9 @@ static void cw_task(void) {
 }
 
 /* ─────────────────────────────────────────────
- * Startup animation (no loop)
+ * Startup animation (no loop) 50% faster
  * ───────────────────────────────────────────── */
-
-#define START_BAR_STEP_MS   111u
+#define START_BAR_STEP_MS   74u
 #define START_BAR_STEPS     19u
 #define START_TOTAL_MS      (START_BAR_STEP_MS * START_BAR_STEPS)
 
@@ -625,13 +665,19 @@ static inline void set_display_mode(display_mode_t mode) {
         cw_bar_last_update = 0;
         cw_bar_cached_level = 0;
 
+        cw_tone_preview = false;
+        cw_gap_debt_ms = 0;
+        cw_last_on_extra_ms = 0;
+
         cw_audio_hard_stop();
+
     } else if (g_mode == MODE_CW) {
         segments_all_off();
         max7219_blank_all();
         max7219_force_on();
 
-        cw_wpm = 20;
+        cw_wpm = CW_DEFAULT_WPM;
+
         cw_edit_active = false;
         cw_edit_len = 0;
         cw_edit_buf[0] = '\0';
@@ -644,6 +690,10 @@ static inline void set_display_mode(display_mode_t mode) {
         cw_err_flash_until = 0;
         cw_bar_last_update = timer_read32();
         cw_bar_cached_level = 0;
+
+        cw_tone_preview = false;
+        cw_gap_debt_ms = 0;
+        cw_last_on_extra_ms = 0;
 
         cw_audio_hard_stop();
 
@@ -731,6 +781,9 @@ static void startup_max_task(void) {
     for (uint8_t d = 0; d < MAX7219_NUM_DIGITS && d < 4; d++) max7219_write_digit(d, out[d]);
 }
 
+/* ─────────────────────────────────────────────
+ * Tasks
+ * ───────────────────────────────────────────── */
 void housekeeping_task_user(void) {
     if (g_startup_running) {
         startup_bar_task();
@@ -819,18 +872,70 @@ void matrix_scan_user(void) {
 }
 
 /* ─────────────────────────────────────────────
+ * WPM commit helper (NEW)
+ * ───────────────────────────────────────────── */
+static void cw_commit_wpm_from_buf(void) {
+    // We require exactly 2 digits: "00".."99"
+    if (cw_edit_len != 2) return;
+
+    uint16_t v = (uint16_t)((cw_edit_buf[0] - '0') * 10u + (uint16_t)(cw_edit_buf[1] - '0'));
+    if (v < 1) v = 1;
+    if (v > 99) v = 99;
+
+    cw_wpm = v;
+
+    cw_edit_active = false;
+    cw_edit_len = 0;
+    cw_edit_buf[0] = '\0';
+
+    cw_display_wpm(cw_wpm);
+}
+
+/* ─────────────────────────────────────────────
  * Macro handler
  * ───────────────────────────────────────────── */
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // MOMENTARY TONE: handle on press + release
+    if (keycode == TONE) {
+        if (g_mode != MODE_CW) return false;
+
+        if (record->event.pressed) {
+            cw_tone_preview = true;
+            cw_state = CW_IDLE;
+            cw_pat = NULL;
+            cw_intra_symbol_gap = false;
+            cw_tone_on();
+        } else {
+            cw_tone_preview = false;
+            cw_tone_off();
+        }
+        return false;
+    }
+
+    // only below here: pressed-only behavior
     if (!record->event.pressed) return true;
 
+    // While editing WPM:
+    // - accept exactly 2 digits then auto-commit/exit
+    // - allow backspace
+    // - WPMT cancels edit (exit without changing)
     if (g_mode == MODE_CW && cw_edit_active) {
         if (keycode == WPMT) {
-            // fall through
+            // cancel edit (no commit)
+            cw_edit_active = false;
+            cw_edit_len = 0;
+            cw_edit_buf[0] = '\0';
+            cw_display_wpm(cw_wpm);
+            return false;
         } else if (is_digit_kc(keycode)) {
             if (cw_edit_len < 2) {
                 cw_edit_buf[cw_edit_len++] = digit_from_kc(keycode);
                 cw_edit_buf[cw_edit_len] = '\0';
+            }
+
+            // NEW: auto-commit after the 2nd digit
+            if (cw_edit_len == 2) {
+                cw_commit_wpm_from_buf();
             }
             return false;
         } else if (keycode == KC_BSPC) {
@@ -840,6 +945,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
         } else {
+            // swallow everything else while editing
             return false;
         }
     }
@@ -856,29 +962,36 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
 
         case WPMT:
+            // NEW: WPMT only ENTERS edit mode. Exit happens automatically after 2 digits.
             if (g_mode != MODE_CW) return false;
 
-            if (!cw_edit_active) {
-                cw_edit_active = true;
-                cw_edit_len = 0;
-                cw_edit_buf[0] = '\0';
-            } else {
-                uint16_t v = 0;
-                for (uint8_t i = 0; i < cw_edit_len; i++) v = (uint16_t)(v * 10u + (uint16_t)(cw_edit_buf[i] - '0'));
-                if (v < 1) v = 1;
-                if (v > 99) v = 99;
-                cw_wpm = v;
+            cw_edit_active = true;
+            cw_edit_len = 0;
+            cw_edit_buf[0] = '\0';
 
-                cw_edit_active = false;
-                cw_edit_len = 0;
-                cw_edit_buf[0] = '\0';
+            // show 00 immediately so user knows they must type 2 digits (0x0F blank -> we show 00)
+            cw_display_wpm(0);
+            return false;
 
-                cw_display_wpm(cw_wpm);
-            }
+        case TNUP:
+            if (g_mode != MODE_CW) return false;
+            cw_tone_hz = clampf(cw_tone_hz + CW_TONE_STEP_HZ, CW_TONE_MIN_HZ, CW_TONE_MAX_HZ);
+            cw_tone_restart_if_running();
+            return false;
+
+        case TNDN:
+            if (g_mode != MODE_CW) return false;
+            cw_tone_hz = clampf(cw_tone_hz - CW_TONE_STEP_HZ, CW_TONE_MIN_HZ, CW_TONE_MAX_HZ);
+            cw_tone_restart_if_running();
             return false;
     }
 
     if (g_mode == MODE_CW) {
+        // While holding tone, don't enqueue CW
+        if (cw_tone_preview) {
+            return true;
+        }
+
         if (keycode == KC_BSPC) {
             cw_q_pop_last();
             return false;
@@ -913,26 +1026,26 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     return true;
 }
 
+
 /* ─────────────────────────────────────────────
  * Keymaps
- * ─────────────────────────────────────────────
- */
+ * ───────────────────────────────────────────── */
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 [_BASE] = LAYOUT(
-    QK_BOOT,    KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_MINS, KC_EQL,  KC_BSPC, KC_BSPC,   LEDT,
-     KC_TAB,    _______, KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_LBRC, KC_RBRC, KC_BSLS,   CWMD,
-    _______, KC_CAPS,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L,    KC_SCLN, KC_QUOT, KC_ENT,    _______,   WPMT,
-    _______, KC_LSFT,    KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH, KC_RSFT, _______,   _______,
+     KC_ESC,     KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0, KC_MINS,  KC_EQL, KC_BSPC, KC_BSPC,   CWMD,
+     KC_TAB,  KC_GRV,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P, KC_LBRC, KC_RBRC, KC_BSLS, CK_TOGG,
+    KC_LCTL, KC_CAPS,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L, KC_SCLN, KC_QUOT,    TONE,  KC_ENT, MU_TOGG,
+    MO(_FN), KC_LSFT,    KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH, KC_RSFT, KC_RALT, KC_RGUI,
                                                            KC_SPC
 ),
 
 [_FN] = LAYOUT(
+    QK_BOOT, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,    WPMT,
     _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
     _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
-    _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
-    _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
-                                                             CWMD
+    _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,    TNDN,    TNUP,
+                                                             LEDT
 ),
 };
 
