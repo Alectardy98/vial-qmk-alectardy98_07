@@ -51,7 +51,7 @@ enum custom_keycode {
  * Display modes
  * ───────────────────────────────────────────── */
 typedef enum {
-    MODE_DEFAULT = 0, // BOTH displays OFF
+    MODE_DEFAULT = 0, // BOTH displays OFF (except overlays/counter)
     MODE_TEST    = 1, // Bar + MAX7219 test patterns
     MODE_CW      = 2, // CW mode: WPM display + audio sidetone
 } display_mode_t;
@@ -158,15 +158,45 @@ static inline void max7219_write_digit(uint8_t digit, uint8_t val) {
     max7219_tx((uint8_t)(REG_DIGIT0 + digit), val);
 }
 
-static inline void max7219_blank_all(void) {
-    for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) {
-        max7219_write_digit(d, 0x0F); // blank in Code-B decode
-    }
+/* ─────────────────────────────────────────────
+ * MAX7219 decode-mode switching (digits vs raw segments)
+ * ─────────────────────────────────────────────
+ *
+ * IMPORTANT FIX:
+ * Your digits look correct in Code-B decode mode, but FN/CAPS are wrong in raw mode.
+ * That means our *bit-to-segment* mapping was wrong.
+ *
+ * Correct (common) MAX7219 raw segment bit layout used by most libs:
+ *   bit0=A, bit1=B, bit2=C, bit3=D, bit4=E, bit5=F, bit6=G, bit7=DP
+ */
+#define SEG_A  0x40
+#define SEG_B  0x20
+#define SEG_C  0x10
+#define SEG_D  0x08
+#define SEG_E  0x04
+#define SEG_F  0x02
+#define SEG_G  0x01
+#define SEG_DP 0x80
+
+static uint8_t g_decode_mask = 0;
+static bool    g_decode_on   = true;
+
+static inline void max7219_set_decode(bool enable) {
+    if (g_decode_on == enable) return;
+    g_decode_on = enable;
+    max7219_tx(REG_DECODE, enable ? g_decode_mask : 0x00);
 }
 
 static inline void max7219_force_on(void) {
     max7219_tx(REG_SHUTDOWN, 0x01);
     max7219_tx(REG_TEST, 0x00);
+}
+
+static inline void max7219_blank_all(void) {
+    max7219_set_decode(true);
+    for (uint8_t d = 0; d < MAX7219_NUM_DIGITS; d++) {
+        max7219_write_digit(d, 0x0F); // blank in Code-B decode
+    }
 }
 
 void max7219_init(void) {
@@ -179,11 +209,151 @@ void max7219_init(void) {
     max7219_tx(REG_SHUTDOWN, 0x01);
     max7219_tx(REG_SCANLIM, (uint8_t)(MAX7219_NUM_DIGITS - 1));
 
-    uint8_t decode_mask = (MAX7219_NUM_DIGITS >= 8) ? 0xFF : (uint8_t)((1u << MAX7219_NUM_DIGITS) - 1u);
-    max7219_tx(REG_DECODE, decode_mask);
+    g_decode_mask = (MAX7219_NUM_DIGITS >= 8) ? 0xFF : (uint8_t)((1u << MAX7219_NUM_DIGITS) - 1u);
+    max7219_tx(REG_DECODE, g_decode_mask);
+    g_decode_on = true;
 
     max7219_tx(REG_INTENSITY, (MAX7219_INTENSITY_DEFAULT & 0x0F));
     max7219_blank_all();
+}
+
+/* ─────────────────────────────────────────────
+ * DEFAULT MODE: keypress counter + responsive bar + FN/CAPS overlays
+ * ───────────────────────────────────────────── */
+
+// Slightly slower decay than before (still responsive)
+#ifndef BAR_ACTIVITY_MAX
+#    define BAR_ACTIVITY_MAX 255u
+#endif
+#ifndef BAR_ACTIVITY_BOOST
+#    define BAR_ACTIVITY_BOOST 38u
+#endif
+#ifndef BAR_ACTIVITY_DECAY_MS
+#    define BAR_ACTIVITY_DECAY_MS 18u   // was 12 (slower)
+#endif
+#ifndef BAR_ACTIVITY_DECAY_STEP
+#    define BAR_ACTIVITY_DECAY_STEP 7u  // was 9 (slower)
+#endif
+#ifndef BAR_RENDER_MS
+#    define BAR_RENDER_MS 14u           // was 12 (slightly slower render)
+#endif
+
+static uint8_t  g_bar_activity   = 0;
+static uint32_t g_bar_last_decay = 0;
+static uint32_t g_bar_last_render = 0;
+
+// 4-digit keypress counter (default mode)
+static uint16_t g_keypress_count = 0;
+
+static inline void bar_activity_boost(void) {
+    uint16_t v = (uint16_t)g_bar_activity + (uint16_t)BAR_ACTIVITY_BOOST;
+    g_bar_activity = (v > BAR_ACTIVITY_MAX) ? (uint8_t)BAR_ACTIVITY_MAX : (uint8_t)v;
+}
+
+static inline uint8_t bar_level_from_activity(uint8_t a) {
+    if (a == 0) return 0;
+    uint16_t level = (uint16_t)((a * 10u + 254u) / 255u); // ceil
+    if (level > 10) level = 10;
+    if (level < 1) level = 1;
+    return (uint8_t)level;
+}
+
+static void default_bar_task(void) {
+    uint32_t now = timer_read32();
+
+    if (TIMER_DIFF_32(now, g_bar_last_decay) >= BAR_ACTIVITY_DECAY_MS) {
+        g_bar_last_decay = now;
+
+        if (g_bar_activity > 0) {
+            uint8_t dec = BAR_ACTIVITY_DECAY_STEP;
+            g_bar_activity = (g_bar_activity > dec) ? (g_bar_activity - dec) : 0;
+        }
+    }
+
+    if (TIMER_DIFF_32(now, g_bar_last_render) < BAR_RENDER_MS) return;
+    g_bar_last_render = now;
+
+    uint8_t level = bar_level_from_activity(g_bar_activity);
+
+    segments_all_off();
+    for (uint8_t s = 1; s <= level; s++) {
+        segment_set(s, true);
+    }
+}
+
+static void max7219_show_count_4(uint16_t v) {
+    // 0000..9999 in Code-B decode
+    max7219_force_on();
+    max7219_set_decode(true);
+
+    uint16_t x = (v % 10000u);
+
+    uint8_t d0 = (uint8_t)(x % 10u); x /= 10u;
+    uint8_t d1 = (uint8_t)(x % 10u); x /= 10u;
+    uint8_t d2 = (uint8_t)(x % 10u); x /= 10u;
+    uint8_t d3 = (uint8_t)(x % 10u);
+
+    max7219_write_digit(0, d3);
+    if (MAX7219_NUM_DIGITS > 1) max7219_write_digit(1, d2);
+    if (MAX7219_NUM_DIGITS > 2) max7219_write_digit(2, d1);
+    if (MAX7219_NUM_DIGITS > 3) max7219_write_digit(3, d0);
+}
+
+// Your requested segment edits for FN/CAPS (RAW segment mode)
+static void max7219_show_FN_custom(void) {
+    max7219_force_on();
+    max7219_set_decode(false);
+
+    // FN:
+    // display0: "F" with B,C OFF and F,E ON (and we keep A+G ON to make a real F)
+    uint8_t Fmask = (SEG_A | SEG_F | SEG_E | SEG_G); // B,C,D OFF
+    // display1: turn segment F and segment B ON (only)
+    uint8_t Nmask = (SEG_F | SEG_B| SEG_A| SEG_E| SEG_C);
+
+    max7219_write_digit(0, Fmask);
+    if (MAX7219_NUM_DIGITS > 1) max7219_write_digit(1, Nmask);
+    if (MAX7219_NUM_DIGITS > 2) max7219_write_digit(2, 0x00);
+    if (MAX7219_NUM_DIGITS > 3) max7219_write_digit(3, 0x00);
+}
+
+static void max7219_show_CAPS_custom(void) {
+    max7219_force_on();
+    max7219_set_decode(false);
+
+    // CAPS:
+    // display0: segments A, F, E, D
+    uint8_t Cmask = (SEG_A | SEG_F | SEG_E | SEG_D);
+
+    // display1: keep your existing "A" (was correct)
+    uint8_t Amask = (SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G);
+
+    // display2: "P" -> ensure C OFF and E ON (A,B,E,F,G)
+    uint8_t Pmask = (SEG_A | SEG_B | SEG_E | SEG_F | SEG_G);
+
+    // display3: "S" -> F and C ON, B and E OFF (A,F,G,C,D)
+    uint8_t Smask = (SEG_A | SEG_F | SEG_G | SEG_C | SEG_D);
+
+    max7219_write_digit(0, Cmask);
+    if (MAX7219_NUM_DIGITS > 1) max7219_write_digit(1, Amask);
+    if (MAX7219_NUM_DIGITS > 2) max7219_write_digit(2, Pmask);
+    if (MAX7219_NUM_DIGITS > 3) max7219_write_digit(3, Smask);
+}
+
+static void default_display_task(void) {
+    bool fn_active = layer_state_is(_FN);
+    led_t leds = host_keyboard_led_state();
+    bool caps_on = leds.caps_lock;
+
+    // Priority: FN overlay > CAPS overlay > counter
+    if (fn_active) {
+        max7219_show_FN_custom();
+    } else if (caps_on) {
+        max7219_show_CAPS_custom();
+    } else {
+        max7219_show_count_4(g_keypress_count);
+    }
+
+    default_bar_task();
 }
 
 /* ─────────────────────────────────────────────
@@ -198,7 +368,7 @@ static uint16_t cw_wpm = CW_DEFAULT_WPM;
 
 // WPM entry state (CW mode only)
 static bool     cw_edit_active = false;
-static char     cw_edit_buf[4] = {0}; // we only use 2 digits now, but keep room
+static char     cw_edit_buf[4] = {0};
 static uint8_t  cw_edit_len    = 0;
 
 static inline uint16_t cw_dit_ms(void) {
@@ -206,12 +376,10 @@ static inline uint16_t cw_dit_ms(void) {
     return (uint16_t)(1200u / cw_wpm);
 }
 
-// Dot insurance (audio gate only) WITHOUT breaking true WPM
 #ifndef CW_DOT_MIN_MS
 #    define CW_DOT_MIN_MS 30u
 #endif
 
-// IMPORTANT: In QMK, KC_0 is NOT between KC_1 and KC_9.
 static inline bool is_digit_kc(uint16_t kc) {
     return (kc == KC_0) || (kc >= KC_1 && kc <= KC_9);
 }
@@ -219,12 +387,8 @@ static inline char digit_from_kc(uint16_t kc) {
     return (kc == KC_0) ? '0' : (char)('0' + (kc - KC_1 + 1));
 }
 
-/* ─────────────────────────────────────────────
- * CW sidetone using QMK Audio (PWM)
- * ───────────────────────────────────────────── */
 static float cw_tone_hz = 600.0f;
 static bool  cw_tone_running = false;
-
 static bool  cw_tone_preview = false;
 
 #ifndef CW_TONE_STEP_HZ
@@ -257,7 +421,6 @@ static inline void cw_tone_engine_stop(void) {
 
 static inline void cw_tone_on(void)  { cw_tone_engine_start(); }
 static inline void cw_tone_off(void) { cw_tone_engine_stop();  }
-
 static inline void cw_audio_hard_stop(void) { cw_tone_engine_stop(); }
 
 static inline void cw_tone_restart_if_running(void) {
@@ -267,9 +430,6 @@ static inline void cw_tone_restart_if_running(void) {
     cw_tone_engine_start();
 }
 
-/* ─────────────────────────────────────────────
- * Morse table
- * ───────────────────────────────────────────── */
 static const char *cw_morse_for(char c) {
     if (c >= 'a' && c <= 'z') c = (char)(c - 'a' + 'A');
 
@@ -316,10 +476,10 @@ static const char *cw_morse_for(char c) {
     }
 }
 
-/* ─────────────────────────────────────────────
- * Display WPM on MAX7219 digits 2..3 (00–99), blank others
- * ───────────────────────────────────────────── */
 static void cw_display_wpm(uint16_t wpm) {
+    max7219_force_on();
+    max7219_set_decode(true);
+
     if (wpm > 99) wpm = 99;
 
     uint8_t tens = (uint8_t)(wpm / 10u);
@@ -333,7 +493,7 @@ static void cw_display_wpm(uint16_t wpm) {
 }
 
 /* ─────────────────────────────────────────────
- * Type-ahead queue + bargraph
+ * Type-ahead queue + CW bargraph (unchanged)
  * ───────────────────────────────────────────── */
 typedef enum {
     CW_IDLE = 0,
@@ -404,7 +564,6 @@ static inline uint32_t cw_estimate_queue_ms(void) {
     return cw_queue_dits_total * (uint32_t)cw_dit_ms();
 }
 
-/* overflow lockout */
 static bool     cw_queue_locked = false;
 static uint32_t cw_err_flash_until = 0;
 
@@ -422,7 +581,6 @@ static inline void cw_error_beep_and_flash(void) {
     stop_all_notes();
 }
 
-/* bargraph update throttling */
 #ifndef CW_BAR_UPDATE_MS
 #    define CW_BAR_UPDATE_MS 40u
 #endif
@@ -470,7 +628,7 @@ static void cw_bar_update_time_remaining(void) {
 }
 
 /* ─────────────────────────────────────────────
- * Playback working state
+ * Playback working state (unchanged)
  * ───────────────────────────────────────────── */
 static cw_play_state_t cw_state = CW_IDLE;
 static uint32_t cw_next_event_ms = 0;
@@ -479,7 +637,6 @@ static const char *cw_pat = NULL;
 static uint8_t cw_pat_idx = 0;
 static bool cw_intra_symbol_gap = false;
 
-// Dot-insurance accounting (preserve true WPM)
 static uint16_t cw_last_on_extra_ms = 0;
 static uint32_t cw_gap_debt_ms      = 0;
 
@@ -563,7 +720,6 @@ static void cw_task(void) {
 
     max7219_force_on();
 
-    // Show edit buffer while editing
     if (cw_edit_active) {
         uint16_t tmp = 0;
         for (uint8_t i = 0; i < cw_edit_len; i++) tmp = (uint16_t)(tmp * 10u + (uint16_t)(cw_edit_buf[i] - '0'));
@@ -628,7 +784,7 @@ static void cw_task(void) {
 }
 
 /* ─────────────────────────────────────────────
- * Startup animation (no loop) 50% faster
+ * Startup animation (unchanged)
  * ───────────────────────────────────────────── */
 #define START_BAR_STEP_MS   74u
 #define START_BAR_STEPS     19u
@@ -651,6 +807,12 @@ static inline void set_display_mode(display_mode_t mode) {
     if (g_mode == MODE_DEFAULT) {
         segments_all_off();
         max7219_blank_all();
+
+        g_bar_activity = 0;
+        g_bar_last_decay = timer_read32();
+        g_bar_last_render = 0;
+
+        // counter keeps running; do not reset unless you want it reset here
 
         cw_edit_active = false;
         cw_edit_len = 0;
@@ -716,6 +878,10 @@ void keyboard_pre_init_user(void) {
 
     segments_all_off();
     g_mode = MODE_DEFAULT;
+
+    g_bar_activity = 0;
+    g_bar_last_decay = timer_read32();
+    g_bar_last_render = 0;
 }
 
 void keyboard_post_init_user(void) {
@@ -735,7 +901,7 @@ void keyboard_post_init_user(void) {
 }
 
 /* ─────────────────────────────────────────────
- * Startup animation tasks
+ * Startup animation tasks (unchanged)
  * ───────────────────────────────────────────── */
 static void startup_bar_task(void) {
     uint32_t now = timer_read32();
@@ -765,6 +931,7 @@ static void startup_max_task(void) {
     }
 
     max7219_force_on();
+    max7219_set_decode(true); // startup uses digits
 
     uint8_t stage = 0;
     if (elapsed < START_STAGE0_END) stage = 0;
@@ -792,6 +959,11 @@ void housekeeping_task_user(void) {
 
     if (g_mode == MODE_CW) {
         cw_bar_update_time_remaining();
+        return;
+    }
+
+    if (g_mode == MODE_DEFAULT) {
+        default_bar_task();
         return;
     }
 
@@ -834,6 +1006,11 @@ void matrix_scan_user(void) {
         return;
     }
 
+    if (g_mode == MODE_DEFAULT) {
+        default_display_task();
+        return;
+    }
+
     if (g_mode == MODE_CW) {
         cw_task();
         return;
@@ -852,6 +1029,7 @@ void matrix_scan_user(void) {
     last = now;
 
     max7219_force_on();
+    max7219_set_decode(true);
 
     uint8_t out[4] = {0x0F, 0x0F, 0x0F, 0x0F};
 
@@ -872,10 +1050,9 @@ void matrix_scan_user(void) {
 }
 
 /* ─────────────────────────────────────────────
- * WPM commit helper (NEW)
+ * WPM commit helper
  * ───────────────────────────────────────────── */
 static void cw_commit_wpm_from_buf(void) {
-    // We require exactly 2 digits: "00".."99"
     if (cw_edit_len != 2) return;
 
     uint16_t v = (uint16_t)((cw_edit_buf[0] - '0') * 10u + (uint16_t)(cw_edit_buf[1] - '0'));
@@ -895,6 +1072,13 @@ static void cw_commit_wpm_from_buf(void) {
  * Macro handler
  * ───────────────────────────────────────────── */
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // DEFAULT mode: every keypress boosts bar + increments counter
+    if (record->event.pressed && !g_startup_running && g_mode == MODE_DEFAULT) {
+        bar_activity_boost();
+        g_keypress_count++;
+        if (g_keypress_count >= 10000u) g_keypress_count = 0;
+    }
+
     // MOMENTARY TONE: handle on press + release
     if (keycode == TONE) {
         if (g_mode != MODE_CW) return false;
@@ -912,16 +1096,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         return false;
     }
 
-    // only below here: pressed-only behavior
     if (!record->event.pressed) return true;
 
-    // While editing WPM:
-    // - accept exactly 2 digits then auto-commit/exit
-    // - allow backspace
-    // - WPMT cancels edit (exit without changing)
     if (g_mode == MODE_CW && cw_edit_active) {
         if (keycode == WPMT) {
-            // cancel edit (no commit)
             cw_edit_active = false;
             cw_edit_len = 0;
             cw_edit_buf[0] = '\0';
@@ -932,8 +1110,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 cw_edit_buf[cw_edit_len++] = digit_from_kc(keycode);
                 cw_edit_buf[cw_edit_len] = '\0';
             }
-
-            // NEW: auto-commit after the 2nd digit
             if (cw_edit_len == 2) {
                 cw_commit_wpm_from_buf();
             }
@@ -945,7 +1121,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
         } else {
-            // swallow everything else while editing
             return false;
         }
     }
@@ -962,14 +1137,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
 
         case WPMT:
-            // NEW: WPMT only ENTERS edit mode. Exit happens automatically after 2 digits.
             if (g_mode != MODE_CW) return false;
 
             cw_edit_active = true;
             cw_edit_len = 0;
             cw_edit_buf[0] = '\0';
 
-            // show 00 immediately so user knows they must type 2 digits (0x0F blank -> we show 00)
             cw_display_wpm(0);
             return false;
 
@@ -987,10 +1160,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (g_mode == MODE_CW) {
-        // While holding tone, don't enqueue CW
-        if (cw_tone_preview) {
-            return true;
-        }
+        if (cw_tone_preview) return true;
 
         if (keycode == KC_BSPC) {
             cw_q_pop_last();
@@ -1025,7 +1195,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
     return true;
 }
-
 
 /* ─────────────────────────────────────────────
  * Keymaps
