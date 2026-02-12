@@ -32,7 +32,6 @@ enum _layer {
     _BASE,
     _FN,
     _FN2,
-
 };
 
 /* ─────────────────────────────────────────────
@@ -384,6 +383,29 @@ static void max7219_show_FN2_custom(void) {
     if (MAX7219_NUM_DIGITS > 3) max7219_write_digit(3, Twom);
 }
 
+/* ─────────────────────────────────────────────
+ * FN bar animation (LOOPING): 1→10→9→1 forever while FN is held
+ * ───────────────────────────────────────────── */
+#define FN_BAR_STEP_MS   74u
+#define FN_BAR_STEPS     19u
+#define FN_TOTAL_MS      (FN_BAR_STEP_MS * FN_BAR_STEPS)
+
+static void fn_loop_bar_task(void) {
+    uint32_t now = timer_read32();
+
+    // Loop forever
+    uint32_t elapsed = now % FN_TOTAL_MS;
+
+    uint32_t step = elapsed / FN_BAR_STEP_MS;
+    if (step >= FN_BAR_STEPS) step = FN_BAR_STEPS - 1;
+
+    // step 0..9 -> seg 1..10, step 10..18 -> seg 9..1
+    uint8_t seg = (step <= 9) ? (uint8_t)(1u + step) : (uint8_t)(19u - step);
+
+    segments_all_off();
+    segment_set(seg, true);
+}
+
 static void default_display_task(void) {
     bool fn2_active = layer_state_is(_FN2);
     bool fn_active  = layer_state_is(_FN);
@@ -394,12 +416,17 @@ static void default_display_task(void) {
     if (fn2_active) {
         max7219_show_FN2_custom();
         segments_all_on();      // ALL segments ON in FN2
-        return;                 // skip decay/render behavior
+        return;                 // skip other behavior
     }
 
     if (fn_active) {
+        // FN: show "FN" and run the looping sweep animation regardless of typing
         max7219_show_FN_custom();
-    } else if (caps_on) {
+        fn_loop_bar_task();
+        return;
+    }
+
+    if (caps_on) {
         max7219_show_CAPS_custom();
     } else {
         max7219_show_count_4(g_keypress_count);
@@ -1015,6 +1042,7 @@ void housekeeping_task_user(void) {
     }
 
     if (g_mode == MODE_DEFAULT) {
+        // NOTE: FN's bar animation is handled in default_display_task()
         default_bar_task();
         return;
     }
@@ -1216,64 +1244,127 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
     // Your custom “user macros”
     switch (keycode) {
-        case TEST: SEND_STRING("TEST"); return false;
-
-        case VDRT: SEND_STRING(SS_LGUI(SS_DOWN(X_LCTL) SS_TAP(X_RIGHT) SS_UP(X_LCTL))); return false;
-        case VDLT: SEND_STRING(SS_LGUI(SS_DOWN(X_LCTL) SS_TAP(X_LEFT)  SS_UP(X_LCTL))); return false;
-        case VDUP: SEND_STRING(SS_LGUI(SS_TAP(X_TAB) SS_TAP(X_T))); return false;
-        case VDDN: SEND_STRING(SS_LGUI("d")); return false;
-
-        case EXPL: SEND_STRING(SS_LGUI("e")); return false;
-        case SNIP: SEND_STRING(SS_LGUI(SS_LSFT("s"))); return false;
-
-        case COPY: SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_A) SS_TAP(X_C))); return false;
-        case CUTT: SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_A) SS_TAP(X_X))); return false;
-        case PAST: SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_V)));             return false;
-
+        case TEST:
+            SEND_STRING("TEST");
+            break;
+        case VDRT:
+            SEND_STRING(SS_LGUI(SS_DOWN(X_LCTL) SS_TAP(X_RIGHT) SS_UP(X_LCTL)));
+            break;
+        case VDLT:
+            SEND_STRING(SS_LGUI(SS_DOWN(X_LCTL) SS_TAP(X_LEFT) SS_UP(X_LCTL)));
+            break;
+        case VDUP:
+            SEND_STRING(SS_LGUI(SS_TAP(X_TAB) SS_TAP(X_T)));
+            break;
+        case VDDN:
+            SEND_STRING(SS_LGUI("d"));
+            break;
+        case EXPL:
+            SEND_STRING(SS_LGUI("e"));
+            break;
+        case SNIP:
+            SEND_STRING(SS_LGUI(SS_LSFT("s")));
+            break;
+        case COPY:
+            SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_A) SS_TAP(X_C)));
+            break;
+        case CUTT:
+            SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_A) SS_TAP(X_X)));
+            break;
+        case PAST:
+            SEND_STRING(SS_TAP(X_F2) SS_LCTL(SS_TAP(X_V)));
+            break;
         case TASK:
-            SEND_STRING(SS_LCTL(SS_DOWN(X_RSFT) SS_TAP(X_ESCAPE) SS_UP(X_RSFT))); // Windows
-            SEND_STRING(SS_LCTL(SS_DOWN(X_LALT)  SS_TAP(X_ESCAPE) SS_UP(X_LALT))); // Mac
-            return false;
-
-        case GOGL: SEND_STRING(SS_LCTL(SS_LALT(SS_TAP(X_G)))); return false;
-        case CMD:  SEND_STRING(SS_LCTL(SS_LALT(SS_TAP(X_T)))); return false;
-
+            SEND_STRING(SS_LCTL(SS_DOWN(X_RSFT) SS_TAP(X_ESCAPE) SS_UP(X_RSFT)));  // Windows
+            SEND_STRING(SS_LCTL(SS_DOWN(X_LALT) SS_TAP(X_ESCAPE) SS_UP(X_LALT)));    // Mac
+            break;
+        case GOGL:
+            SEND_STRING(SS_LCTL(SS_LALT(SS_TAP(X_G))));
+            break;
+        case CMD:
+            SEND_STRING(SS_LCTL(SS_LALT(SS_TAP(X_T))));
+            break;
         case QUIT:
-            SEND_STRING(SS_LALT(SS_TAP(X_F4))); // Windows
-            SEND_STRING(SS_LCTL(SS_TAP(X_W)));  // Mac
-            return false;
-
-        case DZRO: SEND_STRING("00"); return false;
-        case ATAB: SEND_STRING(SS_LALT(SS_TAP(X_TAB))); return false;
-
-        case LPRC: SEND_STRING("("); return false;
-        case RPRC: SEND_STRING(")"); return false;
-
+            SEND_STRING(SS_LALT(SS_TAP(X_F4)));     // Windows
+            SEND_STRING(SS_LCTL(SS_TAP(X_W)));      // Mac
+            break;
+        case DZRO:
+            SEND_STRING("00");
+            break;
+        case ATAB:
+            SEND_STRING(SS_LALT(SS_TAP(X_TAB)));
+            break;
+        case LPRC:
+            SEND_STRING("(");
+            break;
+        case RPRC:
+            SEND_STRING(")");
+            break;
         case NUM:
-            SEND_STRING(SS_TAP(X_NUM));
-            return false;
-
+            SEND_STRING(SS_TAP(X_NUM));         // Toggles layer change and presses the num lock button, to allow for Num lock toggle to occur for both Mac OS and Windows
+            return true;
+            break;
         // Discord Section
-        case THIS: SEND_STRING(":this:" SS_TAP(X_ENTER)); return false;
-        case OOF:  SEND_STRING(":oof:" SS_TAP(X_ENTER)); return false;
-        case PIKA: SEND_STRING(":surprised:" SS_TAP(X_ENTER)); return false;
-        case SCAT: SEND_STRING(":smiley_cat2:" SS_TAP(X_ENTER)); return false;
-        case FCAT: SEND_STRING(":smiley_cat1:" SS_TAP(X_ENTER)); return false;
-        case HART: SEND_STRING(":heart:" SS_TAP(X_ENTER)); return false;
-        case DROL: SEND_STRING(":drooling_face:" SS_TAP(X_ENTER)); return false;
-        case MONY: SEND_STRING(":smiley_take:" SS_TAP(X_ENTER)); return false;
-        case FHAT: SEND_STRING(":smiley_fedora:" SS_TAP(X_ENTER)); return false;
-        case SPIT: SEND_STRING(":smiley_spit:" SS_TAP(X_ENTER)); return false;
-        case KING: SEND_STRING(":pepe_king:" SS_TAP(X_ENTER)); return false;
-        case FLEX: SEND_STRING(":muscle:" SS_TAP(X_ENTER)); return false;
-        case HAHA: SEND_STRING(":smiley_kekw:" SS_TAP(X_ENTER)); return false;
-        case LCRY: SEND_STRING(":joy:" SS_TAP(X_ENTER)); return false;
-        case NICE: SEND_STRING(":nice~2:" SS_TAP(X_ENTER)); return false;
-        case PPOG: SEND_STRING(":pepe_pog:" SS_TAP(X_ENTER)); return false;
-        case PRAY: SEND_STRING(":pray_tone2:" SS_TAP(X_ENTER)); return false;
-        case SWET: SEND_STRING(":sweat_smile:" SS_TAP(X_ENTER)); return false;
-        case COLD: SEND_STRING(":cold_face:" SS_TAP(X_ENTER)); return false;
-        case THUM: SEND_STRING(":thumbsup:" SS_TAP(X_ENTER)); return false;
+        case THIS:
+            SEND_STRING(":this:" SS_TAP(X_ENTER));
+            break;
+        case OOF:
+            SEND_STRING(":oof:" SS_TAP(X_ENTER));
+            break;
+        case PIKA:
+            SEND_STRING(":surprised:" SS_TAP(X_ENTER));
+            break;
+        case SCAT:
+            SEND_STRING(":smiley_cat2:" SS_TAP(X_ENTER));
+            break;
+        case FCAT:
+            SEND_STRING(":smiley_cat1:" SS_TAP(X_ENTER));
+            break;
+        case HART:
+            SEND_STRING(":heart:" SS_TAP(X_ENTER));
+            break;
+        case DROL:
+            SEND_STRING(":drooling_face:" SS_TAP(X_ENTER));
+            break;
+        case MONY:
+            SEND_STRING(":smiley_take:" SS_TAP(X_ENTER));
+            break;
+        case FHAT:
+            SEND_STRING(":smiley_fedora:" SS_TAP(X_ENTER));
+            break;
+        case SPIT:
+            SEND_STRING(":smiley_spit:" SS_TAP(X_ENTER));
+            break;
+        case KING:
+            SEND_STRING(":pepe_king:" SS_TAP(X_ENTER));
+            break;
+        case FLEX:
+            SEND_STRING(":muscle:" SS_TAP(X_ENTER));
+            break;
+        case HAHA:
+            SEND_STRING(":smiley_kekw:" SS_TAP(X_ENTER));
+            break;
+        case LCRY:
+            SEND_STRING(":joy:" SS_TAP(X_ENTER));
+            break;
+        case NICE:
+            SEND_STRING(":nice~2:" SS_TAP(X_ENTER));
+            break;
+        case PPOG:
+            SEND_STRING(":pepe_pog:" SS_TAP(X_ENTER));
+            break;
+        case PRAY:
+            SEND_STRING(":pray_tone2:" SS_TAP(X_ENTER));
+            break;
+        case SWET:
+            SEND_STRING(":sweat_smile:" SS_TAP(X_ENTER));
+            break;
+        case COLD:
+            SEND_STRING(":cold_face:" SS_TAP(X_ENTER));
+            break;
+        case THUM:
+            SEND_STRING(":thumbsup:" SS_TAP(X_ENTER));
+            break;
     }
 
     // CW typing queue behavior (unchanged)
@@ -1336,10 +1427,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 [_FN] = LAYOUT(
     QK_BOOT,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_DEL,  KC_DEL,    WPMT,
        SNIP, _______, _______, _______, _______, _______, _______, _______, _______, KC_PAUS, KC_SCRL, KC_PSCR,   CK_UP,    COPY,    PAST, _______,
-    _______, _______, C(KC_A), C(KC_S), C(KC_D), C(KC_F), _______, _______, _______, KC_HOME, KC_PGUP, KC_LEFT, KC_RGHT, _______, _______, _______,
+   MO(_FN2), _______, C(KC_A), C(KC_S), C(KC_D), C(KC_F), _______, _______, _______, KC_HOME, KC_PGUP, KC_LEFT, KC_RGHT, _______, _______, _______,
     _______, _______, C(KC_Z), C(KC_X), C(KC_C), C(KC_V), _______, _______, _______,  KC_END, KC_PGDN, KC_DOWN, _______,    TNDN,    TNUP,
                                                              LEDT
 ),
+
 [_FN2] = LAYOUT(
     QK_BOOT, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
     _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,
@@ -1356,4 +1448,3 @@ const uint8_t music_map[MATRIX_ROWS][MATRIX_COLS] = LAYOUT(
      1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
                               0
 );
-

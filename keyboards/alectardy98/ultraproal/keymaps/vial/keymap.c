@@ -307,8 +307,8 @@ static void max7219_show_FN_custom(void) {
     // FN:
     // display0: "F" with B,C OFF and F,E ON (and we keep A+G ON to make a real F)
     uint8_t Fmask = (SEG_A | SEG_F | SEG_E | SEG_G); // B,C,D OFF
-    // display1: turn segment F and segment B ON (only)
-    uint8_t Nmask = (SEG_F | SEG_B| SEG_A| SEG_E| SEG_C);
+    // display1: your custom "N"
+    uint8_t Nmask = (SEG_F | SEG_B | SEG_A | SEG_E | SEG_C);
 
     max7219_write_digit(0, Fmask);
     if (MAX7219_NUM_DIGITS > 1) max7219_write_digit(1, Nmask);
@@ -320,23 +320,38 @@ static void max7219_show_CAPS_custom(void) {
     max7219_force_on();
     max7219_set_decode(false);
 
-    // CAPS:
-    // display0: segments A, F, E, D
     uint8_t Cmask = (SEG_A | SEG_F | SEG_E | SEG_D);
-
-    // display1: keep your existing "A" (was correct)
     uint8_t Amask = (SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G);
-
-    // display2: "P" -> ensure C OFF and E ON (A,B,E,F,G)
     uint8_t Pmask = (SEG_A | SEG_B | SEG_E | SEG_F | SEG_G);
-
-    // display3: "S" -> F and C ON, B and E OFF (A,F,G,C,D)
     uint8_t Smask = (SEG_A | SEG_F | SEG_G | SEG_C | SEG_D);
 
     max7219_write_digit(0, Cmask);
     if (MAX7219_NUM_DIGITS > 1) max7219_write_digit(1, Amask);
     if (MAX7219_NUM_DIGITS > 2) max7219_write_digit(2, Pmask);
     if (MAX7219_NUM_DIGITS > 3) max7219_write_digit(3, Smask);
+}
+
+/* ─────────────────────────────────────────────
+ * FN bar animation (LOOPING): 1→10→9→1 forever while FN is held
+ * ───────────────────────────────────────────── */
+#define FN_BAR_STEP_MS   74u
+#define FN_BAR_STEPS     19u
+#define FN_TOTAL_MS      (FN_BAR_STEP_MS * FN_BAR_STEPS)
+
+static void fn_loop_bar_task(void) {
+    uint32_t now = timer_read32();
+
+    // Loop forever
+    uint32_t elapsed = now % FN_TOTAL_MS;
+
+    uint32_t step = elapsed / FN_BAR_STEP_MS;
+    if (step >= FN_BAR_STEPS) step = FN_BAR_STEPS - 1;
+
+    // step 0..9 -> seg 1..10, step 10..18 -> seg 9..1
+    uint8_t seg = (step <= 9) ? (uint8_t)(1u + step) : (uint8_t)(19u - step);
+
+    segments_all_off();
+    segment_set(seg, true);
 }
 
 static void default_display_task(void) {
@@ -347,6 +362,8 @@ static void default_display_task(void) {
     // Priority: FN overlay > CAPS overlay > counter
     if (fn_active) {
         max7219_show_FN_custom();
+        fn_loop_bar_task();   // animate bar on FN
+        return;               // don't run keypress activity bar
     } else if (caps_on) {
         max7219_show_CAPS_custom();
     } else {
