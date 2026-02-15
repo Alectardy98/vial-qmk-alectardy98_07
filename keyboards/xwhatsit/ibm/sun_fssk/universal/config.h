@@ -24,6 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 #define CONTROLLER_IS_UNIVERSAL_MODEL_F
+//custom  overides
+#define CAPSENSE_CAL_THRESHOLD_OFFSET 120
+#define CAPSENSE_KEYBOARD_SETTLE_TIME_US 8
+#define CAPSENSE_DAC_SETTLE_TIME_US 8
+#define DEBOUNCE 10
 
 // By default we set up for support of xwhatsit's solenoid driver board.
 // Comment out HAPTIC_ENABLE_PIN if you don't have an enable pin:
@@ -45,9 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // The following definitions are compatible with the Model F SMD controllers
 // from here: https://deskthority.net/viewtopic.php?f=7&t=24597 supporting the
 // AT lock lights header
-#define LED_NUM_LOCK_PIN D7
-#define LED_CAPS_LOCK_PIN E6
-#define LED_SCROLL_LOCK_PIN B6
+//#define LED_NUM_LOCK_PIN D7
+//#define LED_CAPS_LOCK_PIN E6
+//#define LED_SCROLL_LOCK_PIN B6
 
 // The following definitions match the lock lights as used by the original
 // xwhatsit firmware, but enabling all three of these is not compatible with
