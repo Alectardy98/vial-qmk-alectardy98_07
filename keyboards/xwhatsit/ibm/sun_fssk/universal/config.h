@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define CONTROLLER_IS_UNIVERSAL_MODEL_F
 //custom  overides
-#define CAPSENSE_CAL_THRESHOLD_OFFSET 90
-#define CAPSENSE_KEYBOARD_SETTLE_TIME_US 6
-#define CAPSENSE_DAC_SETTLE_TIME_US 6
+#define CAPSENSE_CAL_THRESHOLD_OFFSET 120
+#define CAPSENSE_KEYBOARD_SETTLE_TIME_US 12
+#define CAPSENSE_DAC_SETTLE_TIME_US 12
 #define DEBOUNCE 10
 
 // By default we set up for support of xwhatsit's solenoid driver board.
