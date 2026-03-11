@@ -27,16 +27,16 @@ bool led_update_kb(led_t led_state) {
         return false; // Respect user override
     }
         if (layer_state_is(_NUM)) {              // Force Num Lock LED On when in NUM layer
-        writePin(GP20, true);
-    } else {
         writePin(GP20, false);
-    }
-        if (layer_state_is(_FN)) {              // Force Num Lock LED On when in NUM layer
-        writePin(GP22, true);
     } else {
-        writePin(GP22, false);
+        writePin(GP20, true);
     }
-    writePin(GP21, led_state.caps_lock);
+        if (layer_state_is(_FN)) {               // Force FN LED On when in FN layer
+        writePin(GP22, false);
+    } else {
+        writePin(GP22, true);
+    }
+    writePin(GP21, !led_state.caps_lock);
     return true;
 }
 
@@ -227,7 +227,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
    KC_TAB,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P, KC_LBRC, KC_RBRC, KC_BSLS,               KC_DEL,  KC_END, KC_PGDN,     KC_HOME,   KC_UP, KC_PGUP, KC_PPLS,
   KC_CAPS,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L, KC_SCLN, KC_QUOT, _______,  KC_ENT,              _______, _______, _______,     KC_LEFT, _______, KC_RGHT, _______,
   KC_LSFT, _______,    KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH, KC_RSFT, MO(_FN),              _______,   KC_UP, _______,      KC_END, KC_DOWN, KC_PGDN, KC_PEQL,
-  KC_LCTL, KC_LGUI, KC_LALT,                             KC_SPC,                            KC_RALT, KC_RGUI, MO(_FN), KC_RCTL,              KC_LEFT, KC_DOWN, KC_RGHT,      KC_INS, _______,  KC_DEL, _______),
+  MO(_FN), _______, KC_LALT,                             KC_SPC,                            KC_RALT, _______, _______, KC_RCTL,              KC_LEFT, KC_DOWN, KC_RGHT,      KC_INS, _______,  KC_DEL, _______),
 
 [_NUM] = LAYOUT(
   _______,       _______, _______, _______, _______,       _______, _______, _______, _______,       _______, _______, _______, _______,     _______, _______, _______,     _______, _______, _______, _______,
