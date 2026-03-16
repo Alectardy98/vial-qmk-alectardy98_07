@@ -11,8 +11,8 @@
   },
   "indicators": {
     "caps_lock": "GP28",
-    "num_lock": "GP13",
-    "scroll_lock": "GP11",
+    "num_lock": "GP11",
+    "scroll_lock": "GP13",
     "kana": "GP17",
     "on_state": 0,
   },
@@ -36,7 +36,7 @@
   "audio": {
       "driver": "pwm_hardware",
       "power_control": {
-          "pin": "GP15"
+          "pin": "GP17"
       }
   },
   "matrix_pins": {

@@ -17,8 +17,8 @@
 #pragma once
 
 /* Audio */
-#define AUDIO_PIN GP15
-#define AUDIO_PWM_DRIVER PWMD7
+#define AUDIO_PIN GP17
+#define AUDIO_PWM_DRIVER PWMD0
 #define AUDIO_PWM_CHANNEL RP2040_PWM_CHANNEL_B
 #define AUDIO_INIT_DELAY
 #define AUDIO_CLICKY
