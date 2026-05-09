@@ -11,8 +11,8 @@
   },
   "indicators": {
     "caps_lock": "GP28",
-    "num_lock": "GP11",
-    "scroll_lock": "GP13",
+    "num_lock": "GP13",
+    "scroll_lock": "GP11",
     "kana": "GP17",
     "on_state": 0,
   },
