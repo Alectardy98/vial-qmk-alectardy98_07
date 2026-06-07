@@ -1,6 +1,6 @@
 {
-  "keyboard_name": "Granite",
-  "manufacturer": "SGI",
+  "keyboard_name": "Omnial Bigfoot",
+  "manufacturer": "Alectardy98",
   "url": "https://keebal.com",
   "maintainer": "Alectardy98",
   "processor": "RP2040",
@@ -10,8 +10,8 @@
       "vid": "0x7281"
   },
   "indicators": {
-    "caps_lock": "GP1",
-    "num_lock": "GP28",
+    "caps_lock": "GP28",
+    "num_lock": "GP1",
     "scroll_lock": "GP0",
     "on_state": 1,
   },

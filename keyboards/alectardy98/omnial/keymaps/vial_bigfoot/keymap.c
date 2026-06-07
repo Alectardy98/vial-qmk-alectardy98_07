@@ -25,18 +25,6 @@ enum _layer {
 
 
 
-bool led_update_kb(led_t led_state) {
-    if (!led_update_user(led_state)) {
-        return false; // Respect user override
-    }
-    writePin(GP28, led_state.caps_lock);
-    return true;
-    writePin(GP1, led_state.num_lock);
-    return true;
-    writePin(GP0, led_state.scroll_lock);
-    return true;
-}
-
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     
     [_BASE] = LAYOUT(
