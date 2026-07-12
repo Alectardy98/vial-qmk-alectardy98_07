@@ -10,8 +10,8 @@
       "vid": "0x7281"
   },
   "indicators": {
-    "caps_lock": "GP1",
-    "num_lock": "GP28",
+    "caps_lock": "GP28",
+    "num_lock": "GP1",
     "scroll_lock": "GP0",
     "on_state": 1,
   },
