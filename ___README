@@ -1,0 +1,67 @@
+Python 3.13.14 is needed 
+
+QMK / Vial-QMK Setup Guide (macOS Intel)
+
+This guide reproduces the working environment for the user's Vial-QMK repository.
+
+1. Install Apple Command Line Tools
+
+xcode-select --install
+
+2. Install Homebrew
+
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+3. Install Python 3.13
+
+brew install python@3.13
+brew unlink python 2>/dev/null
+brew unlink python@3.14 2>/dev/null
+brew link --overwrite --force python@3.13
+
+4. Add Python 3.13 to PATH
+
+export PATH="/usr/local/opt/python@3.13/bin:/usr/local/opt/python@3.13/libexec/bin:$PATH"
+
+5. Install uv
+
+brew install uv
+
+6. Install QMK CLI
+
+uv tool uninstall qmk
+uv tool install --python /usr/local/opt/python@3.13/bin/python3.13 qmk
+
+7. Verify QMK Python
+
+QMK_PYTHON="$(head -1 "$(which qmk)" | sed 's/^#!//')"
+"$QMK_PYTHON" -c 'import sys, ast; print(sys.version); print(hasattr(ast,"Num"))'
+
+8. Install AVR Toolchain
+
+brew tap osx-cross/avr
+brew install avr-gcc@8
+brew install avr-binutils
+
+9. Add AVR to PATH
+
+export PATH="/usr/local/opt/avr-gcc@8/bin:/usr/local/opt/avr-binutils/bin:$PATH"
+
+10. Clone/Open Repository
+
+git submodule update --init --recursive
+
+11. Configure QMK Home
+
+qmk config user.qmk_home="$HOME/Documents/GitHub/vial-qmk-alectardy98_07"
+
+12. Verify
+
+qmk doctor
+which avr-gcc
+avr-gcc --version
+
+13. Build
+
+make clean
+make xwhatsit2/ibm/fxtal/universal:vial_Karolus
