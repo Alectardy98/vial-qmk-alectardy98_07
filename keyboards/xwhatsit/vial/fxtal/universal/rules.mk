@@ -20,5 +20,6 @@ CUSTOM_MATRIX=lite
 SRC += keyboards/xwhatsit/matrix.c keyboards/xwhatsit/util_comm.c
 HAPTIC_ENABLE = yes
 HAPTIC_DRIVER = solenoid
+
 OPT_DEFS += -include avr/io.h
 OPT_DEFS += -Wno-error=unused-but-set-variable
