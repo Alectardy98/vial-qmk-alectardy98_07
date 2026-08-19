@@ -311,14 +311,21 @@ void Device::disableKeyboard()
         printf("hid error: %ls\n", hid_error(device));
         throw std::runtime_error("hid_write failed to disable keyboard");
     }
-    if ((sizeof(data)-1)!=hid_read_timeout(device, data, sizeof(data)-1, 1000))
+    bool got_util_response = false;
+    for (int attempt = 0; attempt < 10; attempt++)
     {
-        printf("hid error: %ls\n", hid_error(device));
-        throw std::runtime_error("hid_read failed while disabling keyboard");
+        int n = hid_read_timeout(device, data, sizeof(data)-1, 100);
+        if (n == (sizeof(data)-1) &&
+            data[0] == magic[0] &&
+            data[1] == magic[1])
+        {
+            got_util_response = true;
+            break;
+        }
     }
-    if ((data[0] != magic[0]) || (data[1] != magic[1]))
+    if (!got_util_response)
     {
-        throw std::runtime_error("hid_read failed while disabling keyboard -- no magic returned");
+        throw std::runtime_error("hid_read failed while disabling keyboard -- no util response");
     }
     if (data[2] != UTIL_COMM_RESPONSE_OK)
     {

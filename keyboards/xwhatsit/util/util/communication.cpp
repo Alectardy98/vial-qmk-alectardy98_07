@@ -46,6 +46,7 @@ std::vector<std::string> Communication::scan()
         {0x1209, 0xFFF0}, // Vial for F62 (deprecated)
         {0x1209, 0xFFC0}, // Vial for F77 (deprecated)
         {0x16C0, 0x27DB}, // Alec Vial Xwhatsit
+        {0x16C0, 0x27DC}, // Alec Vial Sun FSSK
     };
 
     //printf("Scanning\n");

@@ -7,11 +7,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #-------------------------------------------------
 #
@@ -19,29 +19,21 @@
 #
 #-------------------------------------------------
 
-QT       += core gui
+QT += core gui
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = util
 TEMPLATE = app
 
-# The following define makes your compiler emit warnings if you use
-# any feature of Qt which has been marked as deprecated (the exact warnings
-# depend on your compiler). Please consult the documentation of the
-# deprecated API in order to know how to port your code away from it.
+# Emit warnings when deprecated Qt APIs are used.
 DEFINES += QT_DEPRECATED_WARNINGS
-
-# You can also make your code fail to compile if you use deprecated APIs.
-# In order to do so, uncomment the following line.
-# You can also select to disable deprecated APIs only up to a certain version of Qt.
-#DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 CONFIG += c++11
 
 SOURCES += \
-        main.cpp \
-        mainwindow.cpp \
+    main.cpp \
+    mainwindow.cpp \
     monitorwindow.cpp \
     communication.cpp \
     device.cpp \
@@ -52,7 +44,7 @@ SOURCES += \
     rowdactester.cpp
 
 HEADERS += \
-        mainwindow.h \
+    mainwindow.h \
     monitorwindow.h \
     communication.h \
     device.h \
@@ -62,31 +54,79 @@ HEADERS += \
     columntester.h \
     rowdactester.h
 
-unix:!macx {
-    LIBS += -lhidapi-hidraw
-    #LIBS += -lhidapi-hidraw
-    INCLUDEPATH += /usr/include/hidapi
-}
-
-macx {
-    INCLUDEPATH += /usr/local/opt/hidapi/include/hidapi
-    LIBS += -L/usr/local/opt/hidapi/lib -lhidapi
-}
-
-win32 {
-    # Note: at the moment this configuration is for cross-compiling only. I have not tested native windows compilation.
-    INCLUDEPATH += /mxe/usr/i686-w64-mingw32.static/include/hidapi
-    LIBS += -lhidapi -lsetupapi
-}
-
 FORMS += \
-        mainwindow.ui \
+    mainwindow.ui \
     monitorwindow.ui \
     signal_level.ui \
     columntester.ui \
     rowdactester.ui
 
-# Default rules for deployment.
+# Embedded Qt resources, including Cap-Util.png.
+RESOURCES += resources.qrc
+
+
+# ============================================================
+# Linux
+# ============================================================
+
+unix:!macx {
+    LIBS += -lhidapi-hidraw
+    INCLUDEPATH += /usr/include/hidapi
+
+    # Automatically package the completed Linux build as an AppImage.
+    appimage.target = appimage
+    appimage.depends = $(TARGET)
+    appimage.commands = $$PWD/build_appimage.sh
+    QMAKE_EXTRA_TARGETS += appimage
+
+    QMAKE_POST_LINK += $$PWD/build_appimage.sh;
+}
+
+
+# ============================================================
+# macOS
+# ============================================================
+
+macx {
+    TARGET = Cap-Util
+
+    # Apple Silicon Homebrew
+    exists(/opt/homebrew/opt/hidapi) {
+        INCLUDEPATH += /opt/homebrew/opt/hidapi/include/hidapi
+        LIBS += -L/opt/homebrew/opt/hidapi/lib -lhidapi
+    }
+
+    # Intel Homebrew
+    exists(/usr/local/opt/hidapi) {
+        INCLUDEPATH += /usr/local/opt/hidapi/include/hidapi
+        LIBS += -L/usr/local/opt/hidapi/lib -lhidapi
+    }
+
+    # Native macOS application icon.
+    ICON = Cap-Util.icns
+}
+
+
+# ============================================================
+# Windows
+# ============================================================
+
+win32 {
+    TARGET = Cap-Util
+
+    # Native Windows HIDAPI.
+    LIBS += -lhidapi -lsetupapi
+
+    # Embed the icon into Cap-Util.exe.
+    RC_ICONS = Cap-Util.ico
+}
+
+
+# ============================================================
+# Installation
+# ============================================================
+
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
+
 !isEmpty(target.path): INSTALLS += target

@@ -1,0 +1,4 @@
+The comand to build the util
+From inside the util/util folder
+
+qmake6 util.pro && make -j"$(nproc)"

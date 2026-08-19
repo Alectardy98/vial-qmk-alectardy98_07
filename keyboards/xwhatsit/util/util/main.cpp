@@ -17,10 +17,15 @@
 #include "mainwindow.h"
 #include "communication.h"
 #include <QApplication>
+#include <QIcon>
+#include <QGuiApplication>
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+    QApplication::setApplicationDisplayName("Cap-Util");
+    QApplication::setWindowIcon(QIcon(":/Cap-Util.png"));
+    QGuiApplication::setDesktopFileName("xwhatsit-util");
     Communication comm;
     MainWindow w(comm);
 
