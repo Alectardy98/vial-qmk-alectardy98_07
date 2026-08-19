@@ -147,8 +147,10 @@ void HidThread::nameTranslation(std::string &name)
         name = "keyboards/xwhatsit/ibm/3276_3278_75key/xwhatsit_rev4/xwhatsit_rev4.c";
     if (name.compare("keyboards/xwhatsit/ibm/3276_3278/through_hole/through_hole.c") == 0)
         name = "keyboards/xwhatsit/ibm/3276_3278_75key/through_hole/through_hole.c";
-    if (name.compare("keyboards/xwhatsit/vial/fxtal/universal/universal.c") == 0)
-        name = "keyboards/xwhatsit/ibm/fxtal/universal/universal.c";
+    const std::string vial_prefix = "keyboards/xwhatsit/vial/";
+    const std::string ibm_prefix  = "keyboards/xwhatsit/ibm/";
+    if (name.rfind(vial_prefix, 0) == 0)
+        name = ibm_prefix + name.substr(vial_prefix.size());
     // this is because through_hole has been renamed to universal:
     std::string fromending = "/through_hole/through_hole.c";
     std::string toending = "/universal/universal.c";
