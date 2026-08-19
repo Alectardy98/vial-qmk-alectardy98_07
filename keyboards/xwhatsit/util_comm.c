@@ -19,7 +19,8 @@
 #include "util_comm.h"
 #include "matrix_manipulate.h"
 #include <string.h>
-#include <platforms/eeprom.h>
+#include "eeprom.h"
+#include <progmem.h>
 
 #if defined(KEYBOARD_SHARED_EP) && defined(RAW_ENABLE)
 #error "Enabling the KEYBOARD_SHARED_EP will make the util be unable to communicate with the firmware, because due to hidapi limiations, the util can't figure out which interface to talk to, so it hardcodes interface zero."
@@ -31,9 +32,11 @@
 
 #define min(x, y) (((x) < (y))?(x):(y))
 
+extern const char PROGMEM KEYBOARD_FILENAME[]; // This must be defined in keyboard_name.c to equal the filename. This is sent back to the PC-side software for it to determine which keyboard we are using.
+
 static const uint8_t magic[] = UTIL_COMM_MAGIC;
 
-void raw_hid_receive_util_comm(uint8_t *data, uint8_t length) {  // Changed the name here
+void raw_hid_receive_kb(uint8_t *data, uint8_t length) {
     if (0 != memcmp(data, magic, sizeof(magic))) {
         return;
     }
@@ -107,20 +110,18 @@ void raw_hid_receive_util_comm(uint8_t *data, uint8_t length) {  // Changed the 
             break;
         case UTIL_COMM_GET_KEYBOARD_FILENAME:
             {
+                int string_length = strlen_P(KEYBOARD_FILENAME) + 1;
+                const uint8_t offset = data[3];
                 response[2] = UTIL_COMM_RESPONSE_OK;
-                if (data[3] >= strlen(QMK_KEYBOARD) + 1)
-                {
+                if (offset >= string_length) {
                     response[3] = 0;
                 } else {
-                    static const char keyboard_filename[] PROGMEM = QMK_KEYBOARD;
-                    const char *cptr = keyboard_filename + data[3];
-                    for (int i=3; i < RAW_EPSIZE; i++) {
-                        response[i] = pgm_read_byte(cptr);
-                        if (response[i] == 0) {
-                            break;
-                        }
-                        ++cptr;
+                    const char *substring = KEYBOARD_FILENAME + offset;
+                    string_length -= offset;
+                    if (string_length > RAW_EPSIZE - 3) {
+                        string_length = RAW_EPSIZE - 3;
                     }
+                    memcpy_P(&response[3], substring, string_length);
                 }
                 break;
             }
@@ -165,11 +166,11 @@ void raw_hid_receive_util_comm(uint8_t *data, uint8_t length) {  // Changed the 
                 response[4] = MATRIX_ROWS;
                 #if defined(CONTROLLER_IS_XWHATSIT_BEAMSPRING_REV_4)
                 response[5] = 1;
-                #elif defined(CONTROLLER_IS_XWHATSIT_MODEL_F) || defined(CONTROLLER_IS_WCASS_MODEL_F)
+                #elif defined(CONTROLLER_IS_XWHATSIT_MODEL_F_OR_WCASS_MODEL_F)
                 response[5] = 2;
-                #elif defined(CONTROLLER_IS_UNIVERSAL_BEAMSPRING)
+                #elif defined(CONTROLLER_IS_THROUGH_HOLE_BEAMSPRING)
                 response[5] = 3;
-                #elif defined(CONTROLLER_IS_UNIVERSAL_MODEL_F)
+                #elif defined(CONTROLLER_IS_THROUGH_HOLE_MODEL_F)
                 response[5] = 4;
                 #else
                 response[5] = 0;
@@ -225,6 +226,5 @@ void raw_hid_receive_util_comm(uint8_t *data, uint8_t length) {  // Changed the 
         default:
             break;
     }
-    raw_hid_send(response, sizeof(response));
+    memcpy(data, response, sizeof(response));
 }
-
