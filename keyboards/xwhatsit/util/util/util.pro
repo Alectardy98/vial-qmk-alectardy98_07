@@ -114,10 +114,14 @@ macx {
 win32 {
     TARGET = Cap-Util
 
-    # Native Windows HIDAPI.
-    LIBS += -lhidapi -lsetupapi
+    # Build HIDAPI's native Windows backend directly with MinGW.
+    INCLUDEPATH += C:/hidapi-src/hidapi
+    SOURCES += C:/hidapi-src/windows/hid.c
 
-    # Embed the icon into Cap-Util.exe.
+    # Windows libraries required by HIDAPI.
+    LIBS += -lsetupapi -lcfgmgr32
+
+    # Embed Cap-Util.ico directly into Cap-Util.exe.
     RC_ICONS = Cap-Util.ico
 }
 
